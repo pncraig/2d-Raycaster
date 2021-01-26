@@ -25,10 +25,13 @@ float fPlayerY = 1.0f;
 float fPlayerA = 0.0f;
 
 float fPlayerVel = 0.005f;
-float fPlayerTurnSpeed = 17.5f;
+float fPlayerTurnSpeed = 33.5f;
 
 // The length of the step in between ray-wall checks 
 float deltaStep = 0.08f;
+
+// Keeps an angle in the range [0 - 360)
+float loopAngle(float angle);
 
 // Convert from radians to degrees
 float degrees(float radians);
@@ -121,6 +124,8 @@ int main()
 		if (GetAsyncKeyState((unsigned)'D') & 0x8000)
 			fPlayerA += float(fPlayerTurnSpeed * fElapsedTime);
 
+		fPlayerA = loopAngle(fPlayerA);
+
 		// Determines what the x and y steps are for the player based on the angle of the player and their velocity
 		float playerVelX = fPlayerVel * cosf(radians(fPlayerA));
 		float playerVelY = fPlayerVel * sinf(radians(fPlayerA));
@@ -141,7 +146,7 @@ int main()
 		for (int x = 0; x < nScreenWidth; x++) 
 		{
 			// Determine the angle of the ray 
-			float rayAngle = fPlayerA - ((float)FOV / 2) + ((float)x / (float)nScreenWidth) * (float)FOV;
+			float rayAngle = fPlayerA - ((float)FOV / 2) + ((float)FOV / (float)nScreenWidth * (float)x);
 			bool hitWall = false;
 
 			// Find the x and y steps based on the length of a step
@@ -173,10 +178,13 @@ int main()
 			// Correct the distance
 			float correctedDistance = distance * cosf(radians(fPlayerA - rayAngle));
 
-			float sliceHeight = (nScreenHeight / (correctedDistance + 1));
-			sliceHeight *= FOV / nScreenHeight;
-
+			// Calculates the height of the variable, the *2 is the distance to the projection plane
+			float sliceHeight = (nScreenHeight / (correctedDistance + 1)) * 2;
 			int ceilingGap = (nScreenHeight - sliceHeight) / 2;
+
+			// If the ceiling gap is less than zero, the slice takes up more than the whole screen
+			if (ceilingGap < 0)
+				ceilingGap = 0;
 
 			wchar_t wShade;
 
@@ -214,6 +222,15 @@ int main()
 	}
 
 	return 0;
+}
+
+float loopAngle(float angle)
+{
+	if (angle > 360)
+		return angle - 360;
+	else if (angle <= 0)
+		return angle + 360;
+	else return angle;
 }
 
 float degrees(float radians)
