@@ -19,12 +19,12 @@ int nMapWidth = 20;
 int nMapHeight = 20;
 
 // Player variables
-int FOV = 90;
-float fPlayerX = 1.0f;
-float fPlayerY = 1.0f;
+int FOV = 60;
+float fPlayerX = 9.0f;
+float fPlayerY = 3.0f;
 float fPlayerA = 0.0f;
 
-float fPlayerVel = 0.005f;
+float fPlayerVel = 5.0f;
 float fPlayerTurnSpeed = 43.5f;
 
 // The length of the step in between ray-wall checks 
@@ -124,11 +124,12 @@ int main()
 		if (GetAsyncKeyState((unsigned)'D') & 0x8000)
 			fPlayerA += float(fPlayerTurnSpeed * fElapsedTime);
 
+		// Keeps the player angle from getting too large
 		fPlayerA = loopAngle(fPlayerA);
 
 		// Determines what the x and y steps are for the player based on the angle of the player and their velocity
-		float playerVelX = fPlayerVel * cosf(radians(fPlayerA));
-		float playerVelY = fPlayerVel * sinf(radians(fPlayerA));
+		float playerVelX = fPlayerVel * cosf(radians(fPlayerA)) * fElapsedTime;
+		float playerVelY = fPlayerVel * sinf(radians(fPlayerA)) * fElapsedTime;
 
 		if (GetAsyncKeyState((unsigned)'W') & 0x8000)
 		{
@@ -142,12 +143,57 @@ int main()
 			fPlayerY -= playerVelY;
 		}
 
-		// Run for each column on screen
+
+		// Run collisions
+		if (map[(int)fPlayerY * nMapWidth + (int)fPlayerX] == '#')
+		{
+			int subtractX;
+			int subtractY;
+
+			float xPenetrationLeftRight = fPlayerX - (int)fPlayerX;
+			float xPenetrationRightLeft = 1 - xPenetrationLeftRight;
+			float smallestXPenetration;
+			if (xPenetrationLeftRight < xPenetrationRightLeft)
+			{
+				smallestXPenetration = xPenetrationLeftRight;
+				subtractX = -1;
+			}
+			else 
+			{
+				smallestXPenetration = xPenetrationRightLeft;
+				subtractX = 1;
+			}
+
+			float yPenetrationLeftRight = fPlayerY - (int)fPlayerY;
+			float yPenetrationRightLeft = 1 - yPenetrationLeftRight;
+			float smallestYPenetration;
+			if (yPenetrationLeftRight < yPenetrationRightLeft)
+			{
+				smallestYPenetration = yPenetrationLeftRight;
+				subtractY = -1;
+			}
+			else
+			{
+				smallestYPenetration = yPenetrationRightLeft;
+				subtractY = 1;
+			}
+			while (map[(int)fPlayerY * nMapWidth + (int)fPlayerX] == '#')
+			{
+				if (smallestXPenetration < smallestYPenetration)
+					fPlayerX += smallestXPenetration * subtractX * 1.5;
+				else
+					fPlayerY += smallestYPenetration * subtractY * 1.5;
+			}
+		}
+
+
+		// Cast a ray for each column on screen
 		for (int x = 0; x < nScreenWidth; x++) 
 		{
 			// Determine the angle of the ray 
 			float rayAngle = fPlayerA - ((float)FOV / 2) + ((float)FOV / (float)nScreenWidth * (float)x);
 			bool hitWall = false;
+			bool blank = false;
 
 			// Find the x and y steps based on the length of a step
 			float deltaX = deltaStep * cosf(radians(rayAngle));
@@ -160,14 +206,22 @@ int main()
 			// If a wall is hit, end loop. Otherwise, keep adding to the stepX and stepY coordinates to find a wall
 			while (!hitWall)
 			{
-				if (map[(int)stepY * nMapWidth + (int)stepX] == '#')
-				{
-					hitWall = true;
-					break;
-				}
-
 				stepX += deltaX;
 				stepY += deltaY;
+
+				if (map[(int)stepY * nMapWidth + (int)stepX] == '#')
+				{
+					// If the ray hits the edge of a wall, flag the column to be blank
+					if ((stepX - (int)stepX > 0.92 && stepY - (int)stepY > 0.92) || 
+						(stepX - (int)stepX < 0.08 && stepY - (int)stepY < 0.08) ||
+						(stepX - (int)stepX < 0.08 && stepY - (int)stepY > 0.92) ||
+						(stepX - (int)stepX > 0.92 && stepY - (int)stepY < 0.08))
+					{
+						blank = true;
+					}
+
+					hitWall = true;
+				}
 			}
 
 			// Find the distance between the player and the wall
@@ -181,21 +235,25 @@ int main()
 			// Correct the distance
 			float correctedDistance = distance * cosf(radians(fPlayerA - rayAngle));
 
-			// Calculates the height of the variable, the *10 is the distance to the projection plane
-			float sliceHeight = (nScreenHeight / (correctedDistance + 1)) * 10;
-			int ceilingGap = (nScreenHeight - sliceHeight) / 2;
+			// Calculates the height of the variable, the *15 is the distance to the projection plane
+			float sliceHeight = (nScreenHeight / (correctedDistance + 1)) * 15;
+			int ceilingGap = int((nScreenHeight - sliceHeight) / 2);
 
 			// If the ceiling gap is less than zero, the slice takes up more than the whole screen
 			if (ceilingGap < 0)
 				ceilingGap = 0;
 
+			// If the column should be blank, make it blank
+			if (blank)
+				ceilingGap = nScreenWidth / 2;
+
 			wchar_t wShade;
 
-			if (distance < 45)
+			if (distance < 45.0)
 				wShade = L'\u2588';
-			else if (distance < 85)
+			else if (distance < 85.0)
 				wShade = L'\u2593';
-			else if (distance < 140)
+			else if (distance < 140.0)
 				wShade = L'\u2592';
 			else
 				wShade = L'\u2591';
@@ -206,10 +264,11 @@ int main()
 			}
 		}
 
-
+		// Saves the previous player character so that after displaying the map I can erase the previous player position
 		wchar_t playerPrevCharacter = map[(int)fPlayerY * nMapWidth + (int)fPlayerX];
 		map[(int)fPlayerY * nMapWidth + (int)fPlayerX] = L'P';
 
+		// Draw map
 		for (int x = 0; x < nMapWidth; x++)
 		{
 			for (int y = 0; y < nMapHeight; y++)
@@ -218,6 +277,7 @@ int main()
 			}
 		}
 
+		// Reset map
 		map[(int)fPlayerY * nMapWidth + (int)fPlayerX] = playerPrevCharacter;
 
 		screen[nScreenWidth * nScreenHeight] = '\0';
