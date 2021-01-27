@@ -25,7 +25,7 @@ float fPlayerY = 1.0f;
 float fPlayerA = 0.0f;
 
 float fPlayerVel = 0.005f;
-float fPlayerTurnSpeed = 33.5f;
+float fPlayerTurnSpeed = 43.5f;
 
 // The length of the step in between ray-wall checks 
 float deltaStep = 0.08f;
@@ -174,12 +174,15 @@ int main()
 			float a = fPlayerX - stepX;
 			float b = fPlayerY - stepY;
 			float distance = sqrtf(a * a + b * b);
+			// The multiplication makes the distance what it would've been if the grid squares were ten units wide instead of one
+			// Completely fixes distortion and makes the result just look better
+			distance *= 10;
 
 			// Correct the distance
 			float correctedDistance = distance * cosf(radians(fPlayerA - rayAngle));
 
-			// Calculates the height of the variable, the *2 is the distance to the projection plane
-			float sliceHeight = (nScreenHeight / (correctedDistance + 1)) * 2;
+			// Calculates the height of the variable, the *10 is the distance to the projection plane
+			float sliceHeight = (nScreenHeight / (correctedDistance + 1)) * 10;
 			int ceilingGap = (nScreenHeight - sliceHeight) / 2;
 
 			// If the ceiling gap is less than zero, the slice takes up more than the whole screen
@@ -188,11 +191,11 @@ int main()
 
 			wchar_t wShade;
 
-			if (distance < 3.0)
+			if (distance < 45)
 				wShade = L'\u2588';
-			else if (distance < 8.0)
+			else if (distance < 85)
 				wShade = L'\u2593';
-			else if (distance < 14.0)
+			else if (distance < 140)
 				wShade = L'\u2592';
 			else
 				wShade = L'\u2591';
