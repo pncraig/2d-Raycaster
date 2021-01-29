@@ -24,14 +24,20 @@ float fPlayerX = 9.0f;
 float fPlayerY = 3.0f;
 float fPlayerA = 0.0f;
 
+// Player characteristics
 float fPlayerVel = 5.0f;
 float fPlayerTurnSpeed = 43.5f;
+// Represents how many delta steps are taken before hit testing stops
+int nPlayerRadius = 3;
 
 // The length of the step in between ray-wall checks 
 float deltaStep = 0.08f;
 
 // Keeps an angle in the range [0 - 360)
 float loopAngle(float angle);
+
+// Keeps a value in a certain range
+float constrain(float x, float lo, float hi);
 
 // Convert from radians to degrees
 float degrees(float radians);
@@ -144,49 +150,68 @@ int main()
 		}
 
 
-		// Run collisions
-		if (map[(int)fPlayerY * nMapWidth + (int)fPlayerX] == '#')
+		// Run collisions. I'd like to figure out how to improve this collision system
+		// Variables that will be filled with info from the ray with the longest length
+		float maxDistance = -FLT_MAX;
+		float intersectX = fPlayerX;
+		float intersectY = fPlayerY;
+		// Cast a ray out in a circle around the player
+		for (int angle = 0; angle < 360; angle += 20)
 		{
-			int subtractX;
-			int subtractY;
+			bool missedWall = true;
+			
+			// Get the individual components of the ray slope
+			float deltaX = deltaStep * cosf(radians((float)angle));
+			float deltaY = deltaStep * sinf(radians((float)angle));
 
-			float xPenetrationLeftRight = fPlayerX - (int)fPlayerX;
-			float xPenetrationRightLeft = 1 - xPenetrationLeftRight;
-			float smallestXPenetration;
-			if (xPenetrationLeftRight < xPenetrationRightLeft)
+			// Copy of the player coordinates
+			float stepX = fPlayerX;
+			float stepY = fPlayerY;
+
+			// Instead of running until the ray hits a wall, run until the ray is outside of the player radius
+			for (float i = 0.0f; i < (float)nPlayerRadius * deltaStep; i += deltaStep)
 			{
-				smallestXPenetration = xPenetrationLeftRight;
-				subtractX = -1;
-			}
-			else 
-			{
-				smallestXPenetration = xPenetrationRightLeft;
-				subtractX = 1;
+				stepX += deltaX;
+				stepY += deltaY;
+
+				// If the ray hits a wall unflag that it missed a wall
+				if (map[(int)stepY * nMapWidth + (int)stepX] == '#')
+				{
+					missedWall = false;
+					break;
+				}
 			}
 
-			float yPenetrationLeftRight = fPlayerY - (int)fPlayerY;
-			float yPenetrationRightLeft = 1 - yPenetrationLeftRight;
-			float smallestYPenetration;
-			if (yPenetrationLeftRight < yPenetrationRightLeft)
+			if (missedWall)
+				continue;
+
+			// Calculate distance to intersection point
+			float a = fPlayerX - stepX;
+			float b = fPlayerY - stepY;
+			// No need to correct the distance for collisions
+			float distance = sqrtf(a * a + b * b);
+
+			// Check if the ray is the one which will be used to correct the player position
+			if (distance > maxDistance)
 			{
-				smallestYPenetration = yPenetrationLeftRight;
-				subtractY = -1;
-			}
-			else
-			{
-				smallestYPenetration = yPenetrationRightLeft;
-				subtractY = 1;
-			}
-			while (map[(int)fPlayerY * nMapWidth + (int)fPlayerX] == '#')
-			{
-				if (smallestXPenetration < smallestYPenetration)
-					fPlayerX += smallestXPenetration * subtractX * 1.5;
-				else
-					fPlayerY += smallestYPenetration * subtractY * 1.5;
+				maxDistance = distance;
+				intersectX = stepX;
+				intersectY = stepY;
 			}
 		}
 
+		if (intersectX != fPlayerX && intersectY != fPlayerY)
+		{
+			// Move the player out of the wall. Multiply by a decimal to smooth out the movement
+			fPlayerX += float((fPlayerX - intersectX) * 0.1);
+			fPlayerY += float((fPlayerY - intersectY) * 0.1);
+		}
 
+		// Just in case the above method fails, prevents the program from failing
+		fPlayerX = constrain(fPlayerX, 0.0f, (float)nMapWidth - 1.0f);
+		fPlayerY = constrain(fPlayerY, 0.0f, (float)nMapHeight - 1.0f);
+
+		// Render
 		// Cast a ray for each column on screen
 		for (int x = 0; x < nScreenWidth; x++) 
 		{
@@ -211,11 +236,11 @@ int main()
 
 				if (map[(int)stepY * nMapWidth + (int)stepX] == '#')
 				{
-					// If the ray hits the edge of a wall, flag the column to be blank
-					if ((stepX - (int)stepX > 0.92 && stepY - (int)stepY > 0.92) || 
-						(stepX - (int)stepX < 0.08 && stepY - (int)stepY < 0.08) ||
-						(stepX - (int)stepX < 0.08 && stepY - (int)stepY > 0.92) ||
-						(stepX - (int)stepX > 0.92 && stepY - (int)stepY < 0.08))
+					// If the ray-wall intersection point is in a corner, flag the wall to be blank
+					if (((double)stepX - (int)stepX > 0.92 && (double)stepY - (int)stepY > 0.92) || 
+						((double)stepX - (int)stepX < 0.08 && (double)stepY - (int)stepY < 0.08) ||
+						((double)stepX - (int)stepX < 0.08 && (double)stepY - (int)stepY > 0.92) ||
+						((double)stepX - (int)stepX > 0.92 && (double)stepY - (int)stepY < 0.08))
 					{
 						blank = true;
 					}
@@ -235,18 +260,19 @@ int main()
 			// Correct the distance
 			float correctedDistance = distance * cosf(radians(fPlayerA - rayAngle));
 
-			// Calculates the height of the variable, the *15 is the distance to the projection plane
-			float sliceHeight = (nScreenHeight / (correctedDistance + 1)) * 15;
+			// Calculates the height of the wall, the *15 is the distance to the projection plane
+			float sliceHeight = (nScreenHeight / correctedDistance) * 15;
 			int ceilingGap = int((nScreenHeight - sliceHeight) / 2);
 
 			// If the ceiling gap is less than zero, the slice takes up more than the whole screen
-			if (ceilingGap < 0)
+			if (ceilingGap < 0) 
 				ceilingGap = 0;
 
 			// If the column should be blank, make it blank
 			if (blank)
 				ceilingGap = nScreenWidth / 2;
 
+			// Make the block darker the further away it is from the player
 			wchar_t wShade;
 
 			if (distance < 45.0)
@@ -258,6 +284,7 @@ int main()
 			else
 				wShade = L'\u2591';
 
+			// Fill the column with a slice of the appropiate height
 			for (int y = ceilingGap; y < nScreenHeight - ceilingGap; y++)
 			{
 				screen[y * nScreenWidth + x] = wShade;
@@ -296,12 +323,21 @@ float loopAngle(float angle)
 	else return angle;
 }
 
+float constrain(float x, float lo, float hi)
+{
+	if (x < lo)
+		return lo;
+	else if (x > hi)
+		return hi;
+	else return x;
+}
+
 float degrees(float radians)
 {
-	return radians * (180 / PI);
+	return float(radians * (180 / PI));
 }
 
 float radians(float degrees)
 {
-	return (degrees * PI) / 180;
+	return float((degrees * PI) / 180);
 }
