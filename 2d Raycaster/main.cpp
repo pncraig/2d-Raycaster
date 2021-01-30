@@ -33,6 +33,9 @@ int nPlayerRadius = 3;
 // The length of the step in between ray-wall checks 
 float deltaStep = 0.08f;
 
+// Array of lights
+float lights[][2] = { {0.0f, 0.0f}, {0.0f, 0.0f} };
+
 // Keeps an angle in the range [0 - 360)
 float loopAngle(float angle);
 
@@ -181,7 +184,7 @@ int main()
 					break;
 				}
 			}
-
+			
 			if (missedWall)
 				continue;
 
@@ -206,11 +209,11 @@ int main()
 			fPlayerX += float((fPlayerX - intersectX) * 0.1);
 			fPlayerY += float((fPlayerY - intersectY) * 0.1);
 		}
-
-		// Just in case the above method fails, prevents the program from failing
+		
+		// Just in case the above method fails, prevents the player from going out of bounds
 		fPlayerX = constrain(fPlayerX, 0.0f, (float)nMapWidth - 1.0f);
 		fPlayerY = constrain(fPlayerY, 0.0f, (float)nMapHeight - 1.0f);
-
+		
 		// Render
 		// Cast a ray for each column on screen
 		for (int x = 0; x < nScreenWidth; x++) 
