@@ -33,8 +33,10 @@ int nPlayerRadius = 3;
 // The length of the step in between ray-wall checks 
 float deltaStep = 0.08f;
 
+// Light variables
+const int nNumberOfLights = 2;
 // Array of lights
-float lights[][2] = { {0.0f, 0.0f}, {0.0f, 0.0f} };
+float lights[nNumberOfLights][2] = { {9.0f, 3.0f}, {9.0f, 17.0f} };
 
 // Keeps an angle in the range [0 - 360)
 float loopAngle(float angle);
@@ -214,6 +216,7 @@ int main()
 		fPlayerX = constrain(fPlayerX, 0.0f, (float)nMapWidth - 1.0f);
 		fPlayerY = constrain(fPlayerY, 0.0f, (float)nMapHeight - 1.0f);
 		
+
 		// Render
 		// Cast a ray for each column on screen
 		for (int x = 0; x < nScreenWidth; x++) 
@@ -260,7 +263,7 @@ int main()
 			// Completely fixes distortion and makes the result just look better
 			distance *= 10;
 
-			// Correct the distance
+			// Correct the fish eye effect
 			float correctedDistance = distance * cosf(radians(fPlayerA - rayAngle));
 
 			// Calculates the height of the wall, the *15 is the distance to the projection plane
@@ -275,17 +278,60 @@ int main()
 			if (blank)
 				ceilingGap = nScreenWidth / 2;
 
-			// Make the block darker the further away it is from the player
 			wchar_t wShade;
 
-			if (distance < 45.0)
-				wShade = L'\u2588';
-			else if (distance < 85.0)
-				wShade = L'\u2593';
-			else if (distance < 140.0)
-				wShade = L'\u2592';
-			else
-				wShade = L'\u2591';
+			for (int i = 0; i < nNumberOfLights; i++)
+			{
+				bool foundWall = false;
+
+				float adjacent = stepX - lights[i][0];
+				float opposite = stepY - lights[i][1];
+
+				// This angle is in radians to make future calculations easier
+				float lightRayAngle = atan2f(opposite, adjacent);
+
+				float lightDeltaX = deltaStep * cosf(lightRayAngle);
+				float lightDeltaY = deltaStep * sinf(lightRayAngle);
+
+				float lightStepX = stepX;
+				float lightStepY = stepY;
+
+				while (!foundWall)
+				{
+					lightStepX += lightDeltaX;
+					lightStepY += lightDeltaY;
+
+					if (map[(int)lightStepY * nMapWidth + (int)lightStepY] == '#')
+					{
+						foundWall = true;
+					}
+
+					if ((int)lightStepX == (int)lights[i][0] && (int)lightStepY == (int)lights[i][1])
+					{
+						break;
+					}
+				}
+
+				if (foundWall)
+				{
+					wShade = L'\u2591';
+					continue;
+				}
+				else
+				{
+					float distance = sqrtf(opposite * opposite + adjacent * adjacent);
+
+					if (distance < 4.5)
+						wShade = L'\u2588';
+					else if (distance < 10.0)
+						wShade = L'\u2593';
+					else if (distance < 15.0)
+						wShade = L'\u2592';
+					else
+						wShade = L'\u2591';
+				}
+			}
+
 
 			// Fill the column with a slice of the appropiate height
 			for (int y = ceilingGap; y < nScreenHeight - ceilingGap; y++)
