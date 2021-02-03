@@ -21,7 +21,7 @@ int nMapHeight = 20;
 // Player variables
 int FOV = 60;
 float fPlayerX = 9.0f;
-float fPlayerY = 3.0f;
+float fPlayerY = 4.0f;
 float fPlayerA = 0.0f;
 
 // Player characteristics
@@ -35,8 +35,16 @@ float deltaStep = 0.08f;
 
 // Light variables
 const int nNumberOfLights = 2;
-// Array of lights
-float lights[nNumberOfLights][2] = { {9.0f, 3.0f}, {9.0f, 17.0f} };
+// Array of lights (always should have a .5 in order to increase the accuracy of rays)
+float lights[nNumberOfLights][2] = { {10.5f, 3.5f}, { 10.5f, 17.5f } };
+// Makes it easier for me to find the lightest shade
+enum shade {
+	light,
+	medium,
+	dark,
+	full
+};
+wchar_t shades[4] = { L'\u2591', L'\u2592', L'\u2593', L'\u2588' };
 
 // Keeps an angle in the range [0 - 360)
 float loopAngle(float angle);
@@ -117,6 +125,12 @@ int main()
 	map += L"#..................#";
 	map += L"#..................#";
 	map += L"####################";*/
+
+	// Add lights to the map
+	for (int i = 0; i < nNumberOfLights; i++)
+	{
+		map[(int)lights[i][1] * nMapWidth + (int)lights[i][0]] = L'O';
+	}
 
 	for (;;)
 	{
@@ -240,6 +254,7 @@ int main()
 				stepX += deltaX;
 				stepY += deltaY;
 
+				// The ray is intersecting a wall
 				if (map[(int)stepY * nMapWidth + (int)stepX] == '#')
 				{
 					// If the ray-wall intersection point is in a corner, flag the wall to be blank
@@ -279,59 +294,109 @@ int main()
 				ceilingGap = nScreenWidth / 2;
 
 			wchar_t wShade;
+			shade sShade = light;
 
-			for (int i = 0; i < nNumberOfLights; i++)
+			for (int i = 0; i < nNumberOfLights && !blank; i++)
 			{
 				bool foundWall = false;
+				shade newShade;
 
-				float adjacent = stepX - lights[i][0];
-				float opposite = stepY - lights[i][1];
+				// Calculate the x and y distances from the light source to the intersection point
+				// adjacent = x, opposite = y
+				float adjacent = lights[i][0] - stepX;
+				float opposite = lights[i][1] - stepY;
 
-				// This angle is in radians to make future calculations easier
+				// This is the angle between the slice and the light source
+				// We'll leave it in radians to make future calculations easier
 				float lightRayAngle = atan2f(opposite, adjacent);
 
+				// Get the individual changes in steps
 				float lightDeltaX = deltaStep * cosf(lightRayAngle);
 				float lightDeltaY = deltaStep * sinf(lightRayAngle);
 
+				// The purpose of the lines until the // end is to lessen visual artifacts by moving the intersection point to the
+				// edge that it actually intersected
+
+				// Distance from the x intersection value and the left wall of the grid it is in
+				float xDistanceFromLeft = stepX - (int)stepX;
+				// Distance from the x intersection value and the right wall of the grid it is in
+				float xDistanceFromRight = 1 - xDistanceFromLeft;
+				// The distance that we will consider as the definitive x distance is the smallest distance
+				float xDistance;
+				if (xDistanceFromLeft < xDistanceFromRight)
+					xDistance = xDistanceFromLeft;
+				else
+					xDistance = xDistanceFromRight;
+
+				// Distance from the y intersection value to the top wall of its current grid
+				float yDistanceFromTop = stepY - (int)stepY;
+				// Distance from the y intersection value to the bottom wall of its current grid
+				float yDistanceFromBottom = 1 - yDistanceFromTop;
+				// The distance which we will consider the definitive y distance is the smallest distance
+				float yDistance;
+				if (yDistanceFromTop < yDistanceFromBottom)
+					yDistance = yDistanceFromTop;
+				else
+					yDistance = yDistanceFromBottom;
+
+				// Click the smaller of the two definitive distances to the side of the grid
+				if (xDistance < yDistance)
+					stepX = roundf(stepX);
+				else
+					stepY = roundf(stepY);
+
+				//end
+
+				// Copy the point where a ray from the player intersected the level geometry
 				float lightStepX = stepX;
 				float lightStepY = stepY;
 
+				// Cast the ray while a wall hasn't been found
 				while (!foundWall)
 				{
 					lightStepX += lightDeltaX;
 					lightStepY += lightDeltaY;
 
-					if (map[(int)lightStepY * nMapWidth + (int)lightStepY] == '#')
-					{
-						foundWall = true;
-					}
-
-					if ((int)lightStepX == (int)lights[i][0] && (int)lightStepY == (int)lights[i][1])
+					// If the ray hits a light source, break the loop
+					if (map[(int)lightStepY * nMapWidth + (int)lightStepX] == 'O')
 					{
 						break;
 					}
+
+					// If the ray hits a wall, flag that it has hit a wall
+					if (map[(int)lightStepY * nMapWidth + (int)lightStepX] == '#')
+					{
+						foundWall = true;
+					}
 				}
 
+				// If the ray hit a wall before a light source, skip the calculations
 				if (foundWall)
 				{
-					wShade = L'\u2591';
 					continue;
 				}
-				else
-				{
-					float distance = sqrtf(opposite * opposite + adjacent * adjacent);
 
-					if (distance < 4.5)
-						wShade = L'\u2588';
-					else if (distance < 10.0)
-						wShade = L'\u2593';
-					else if (distance < 15.0)
-						wShade = L'\u2592';
-					else
-						wShade = L'\u2591';
-				}
+				// Calculate the distance between the light source and the intersection point of a ray cast from the player
+				// using values computed earlier
+				float distance = sqrtf(opposite * opposite + adjacent * adjacent);
+
+				// Determine how the slice should be shaded using exclusively this ray
+				if (distance < 4.5f)
+					newShade = full;
+				else if (distance < 9.0f)
+					newShade = dark;
+				else if (distance < 14.0f)
+					newShade = medium;
+				else
+					newShade = light;
+
+				// Check if the shade computed by this ray is the darkest. If so, make it the actual shade of the slice
+				if (newShade > sShade)
+					sShade = newShade;
 			}
 
+			// Use the fact that enums are really just integers to look up the correct shading value
+			wShade = shades[(int)sShade];
 
 			// Fill the column with a slice of the appropiate height
 			for (int y = ceilingGap; y < nScreenHeight - ceilingGap; y++)
