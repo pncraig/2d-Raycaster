@@ -37,7 +37,7 @@ float deltaStep = 0.08f;
 const int nNumberOfLights = 2;
 // Array of lights (always should have a .5 in order to increase the accuracy of rays)
 float lights[nNumberOfLights][2] = { {10.5f, 3.5f}, { 10.5f, 17.5f } };
-// Makes it easier for me to find the lightest shade
+// Makes it easier for me to find the lightest shade because each shading value now has a corresponding integer value
 enum shade {
 	light,
 	medium,
