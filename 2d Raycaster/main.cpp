@@ -6,14 +6,17 @@
 #include <iostream>
 #include <Windows.h>
 #include <stdlib.h>
+#include <sstream>
 #include <cmath>
 #include <chrono>
 using namespace std;
 
 #define PI 3.1415926535
 
-int nScreenWidth = 120;
-int nScreenHeight = 60;
+// Variables inportant to the console
+int nScreenWidth = 192;
+int nScreenHeight = 96;
+float FPS;
 
 int nMapWidth = 20;
 int nMapHeight = 20;
@@ -37,13 +40,15 @@ float deltaStep = 0.08f;
 const int nNumberOfLights = 2;
 // Array of lights (always should have a .5 in order to increase the accuracy of rays)
 float lights[nNumberOfLights][2] = { {10.5f, 3.5f}, { 10.5f, 17.5f } };
-// Makes it easier for me to find the lightest shade because each shading value now has a corresponding integer value
+// Makes it easier for me to find the lightest shade because each shading value now has a corresponding integer value,
+// so I can compare shades to finding the darkest coloring
 enum shade {
 	light,
 	medium,
 	dark,
 	full
 };
+// Holds the possible shades for easy access from a shade
 wchar_t shades[4] = { L'\u2591', L'\u2592', L'\u2593', L'\u2588' };
 
 // Keeps an angle in the range [0 - 360)
@@ -69,10 +74,10 @@ int main()
 	SetConsoleWindowInfo(hConsole, TRUE, &srWindowInfo);
 	SetConsoleScreenBufferSize(hConsole, { (short)nScreenWidth, (short)nScreenHeight });
 
-	// Set the characters to be 8 by 8
+	// Set the characters to be the desired size
 	CONSOLE_FONT_INFOEX cfiConsoleFont;
 	cfiConsoleFont.cbSize = sizeof(cfiConsoleFont);
-	cfiConsoleFont.dwFontSize = { 8, 8 };
+	cfiConsoleFont.dwFontSize = { 5, 5 };
 	cfiConsoleFont.nFont = 0;
 	cfiConsoleFont.FontFamily = FF_DONTCARE;
 	cfiConsoleFont.FontWeight = 400;
@@ -83,6 +88,7 @@ int main()
 	auto tp1 = chrono::system_clock::now();
 	auto tp2 = chrono::system_clock::now();
 
+	// Create and fill a map
 	wstring map;
 	map += L"####################";
 	map += L"#..................#";
@@ -126,7 +132,7 @@ int main()
 	map += L"#..................#";
 	map += L"####################";*/
 
-	// Add lights to the map
+	// Place characters which represent the lights on the map
 	for (int i = 0; i < nNumberOfLights; i++)
 	{
 		map[(int)lights[i][1] * nMapWidth + (int)lights[i][0]] = L'O';
@@ -134,6 +140,7 @@ int main()
 
 	for (;;)
 	{
+		// Wipe the screen
 		for (int i = 0; i < nScreenWidth * nScreenHeight; i++)
 			screen[i] = ' ';
 
@@ -142,6 +149,8 @@ int main()
 		chrono::duration<float> elapsedTime = tp2 - tp1;
 		tp1 = tp2;
 		float fElapsedTime = elapsedTime.count();
+		// Update the frames per second
+		FPS = 1.0f / fElapsedTime;
 
 		// Turn the player
 		if (GetAsyncKeyState((unsigned)'A') & 0x8000)
@@ -156,6 +165,7 @@ int main()
 		float playerVelX = fPlayerVel * cosf(radians(fPlayerA)) * fElapsedTime;
 		float playerVelY = fPlayerVel * sinf(radians(fPlayerA)) * fElapsedTime;
 
+		// Move player forward and backwards
 		if (GetAsyncKeyState((unsigned)'W') & 0x8000)
 		{
 			fPlayerX += playerVelX;
@@ -240,7 +250,7 @@ int main()
 			bool hitWall = false;
 			bool blank = false;
 
-			// Find the x and y steps based on the length of a step
+			// Find the x and y step lengths based on the length of a step use soh cah toa
 			float deltaX = deltaStep * cosf(radians(rayAngle));
 			float deltaY = deltaStep * sinf(radians(rayAngle));
 
@@ -293,6 +303,50 @@ int main()
 			if (blank)
 				ceilingGap = nScreenWidth / 2;
 
+			// The purpose of the lines until the // end is to lessen visual artifacts by shifting the intersection point to the
+			// edge that it actually intersected
+			// This fixes the issue by insuring rays which double back on themselves make it out of the wall
+
+			// Distance from the x intersection value and the left wall of the grid it is in
+			float xDistanceFromLeft = stepX - (int)stepX;
+			// Distance from the x intersection value and the right wall of the grid it is in
+			float xDistanceFromRight = 1 - xDistanceFromLeft;
+			// The distance that we will consider as the definitive x distance is the smallest distance
+			float xDistance;
+			if (xDistanceFromLeft < xDistanceFromRight)
+				xDistance = xDistanceFromLeft;
+			else
+				xDistance = xDistanceFromRight;
+
+			// Distance from the y intersection value to the top wall of its current grid
+			float yDistanceFromTop = stepY - (int)stepY;
+			// Distance from the y intersection value to the bottom wall of its current grid
+			float yDistanceFromBottom = 1 - yDistanceFromTop;
+			// The distance which we will consider the definitive y distance is the smallest distance
+			float yDistance;
+			if (yDistanceFromTop < yDistanceFromBottom)
+				yDistance = yDistanceFromTop;
+			else
+				yDistance = yDistanceFromBottom;
+
+			// Determine which coordinate is the closest to the edge and shift it towards that edge
+			if (xDistance < yDistance)
+				stepX = roundf(stepX);
+			else
+				stepY = roundf(stepY);
+
+			//end
+
+			/*
+			* The algorithm behind the light casting is this: 
+			* 1. Determine the angle between the intersection point of the current slice of the wall and the light source
+			* 2. Cast a ray towards the light source
+			* 3. If the ray hits a wall before it hits a light source, skip all calculations. Otherwise, continue casting the ray
+			* 4. If the ray hits a light source before a wall, find the distance between the intersection point and the wall
+			*    and color the wall based on the distance
+			*/
+
+			// The character the slice will be drawn as and the current shade of the slice
 			wchar_t wShade;
 			shade sShade = light;
 
@@ -313,39 +367,6 @@ int main()
 				// Get the individual changes in steps
 				float lightDeltaX = deltaStep * cosf(lightRayAngle);
 				float lightDeltaY = deltaStep * sinf(lightRayAngle);
-
-				// The purpose of the lines until the // end is to lessen visual artifacts by moving the intersection point to the
-				// edge that it actually intersected
-
-				// Distance from the x intersection value and the left wall of the grid it is in
-				float xDistanceFromLeft = stepX - (int)stepX;
-				// Distance from the x intersection value and the right wall of the grid it is in
-				float xDistanceFromRight = 1 - xDistanceFromLeft;
-				// The distance that we will consider as the definitive x distance is the smallest distance
-				float xDistance;
-				if (xDistanceFromLeft < xDistanceFromRight)
-					xDistance = xDistanceFromLeft;
-				else
-					xDistance = xDistanceFromRight;
-
-				// Distance from the y intersection value to the top wall of its current grid
-				float yDistanceFromTop = stepY - (int)stepY;
-				// Distance from the y intersection value to the bottom wall of its current grid
-				float yDistanceFromBottom = 1 - yDistanceFromTop;
-				// The distance which we will consider the definitive y distance is the smallest distance
-				float yDistance;
-				if (yDistanceFromTop < yDistanceFromBottom)
-					yDistance = yDistanceFromTop;
-				else
-					yDistance = yDistanceFromBottom;
-
-				// Click the smaller of the two definitive distances to the side of the grid
-				if (xDistance < yDistance)
-					stepX = roundf(stepX);
-				else
-					stepY = roundf(stepY);
-
-				//end
 
 				// Copy the point where a ray from the player intersected the level geometry
 				float lightStepX = stepX;
@@ -420,6 +441,11 @@ int main()
 
 		// Reset map
 		map[(int)fPlayerY * nMapWidth + (int)fPlayerX] = playerPrevCharacter;
+
+		// Set the console title to display the framerate
+		wchar_t consoleTitle[100];
+		swprintf_s(consoleTitle, 100, L"Console Raycaster | FPS = %f", FPS);
+		SetConsoleTitle(consoleTitle);
 
 		screen[nScreenWidth * nScreenHeight] = '\0';
 		WriteConsoleOutputCharacter(hConsole, screen, nScreenWidth * nScreenHeight, { 0, 0 }, &dwBytesWritten);
