@@ -64,7 +64,10 @@ float radians(float degrees);
 
 int main()
 {	// << I'm trying this out because I think it looks clean
-	wchar_t* screen = new wchar_t[nScreenWidth * nScreenHeight];
+
+	// Create an array of CHAR_INFO structures and a screen buffer. CHAR_INFO members include a union which holds character
+	// info and a Attributes member which holds the character attributes
+	CHAR_INFO* screen = new CHAR_INFO[nScreenWidth * nScreenHeight];
 	HANDLE hConsole = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	SetConsoleActiveScreenBuffer(hConsole);
 	DWORD dwBytesWritten = 0;
@@ -140,10 +143,12 @@ int main()
 
 	for (;;)
 	{
-		// Wipe the screen
+		// Clear the characters and colors of the last frame
 		for (int i = 0; i < nScreenWidth * nScreenHeight; i++)
-			screen[i] = ' ';
-
+		{
+			screen[i].Char.UnicodeChar = L' ';
+			screen[i].Attributes = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+		}
 		//  Determine how much time has elapsed between frames
 		tp2 = chrono::system_clock::now();
 		chrono::duration<float> elapsedTime = tp2 - tp1;
@@ -422,7 +427,7 @@ int main()
 			// Fill the column with a slice of the appropiate height
 			for (int y = ceilingGap; y < nScreenHeight - ceilingGap; y++)
 			{
-				screen[y * nScreenWidth + x] = wShade;
+				screen[y * nScreenWidth + x].Char.UnicodeChar = wShade;
 			}
 		}
 
@@ -435,7 +440,7 @@ int main()
 		{
 			for (int y = 0; y < nMapHeight; y++)
 			{
-				screen[y * nScreenWidth + x] = map[y * nMapWidth + x];
+				screen[y * nScreenWidth + x].Char.UnicodeChar = map[y * nMapWidth + x];
 			}
 		}
 
@@ -447,8 +452,9 @@ int main()
 		swprintf_s(consoleTitle, 100, L"Console Raycaster | FPS = %f", FPS);
 		SetConsoleTitle(consoleTitle);
 
-		screen[nScreenWidth * nScreenHeight] = '\0';
-		WriteConsoleOutputCharacter(hConsole, screen, nScreenWidth * nScreenHeight, { 0, 0 }, &dwBytesWritten);
+		// screen[nScreenWidth * nScreenHeight] = '\0';
+		SMALL_RECT window = { 0, 0, (short)nScreenWidth, (short)nScreenHeight };
+		WriteConsoleOutput(hConsole, screen, { (short)nScreenWidth, (short)nScreenHeight }, { 0, 0 }, &window);
 	}
 
 	return 0;
