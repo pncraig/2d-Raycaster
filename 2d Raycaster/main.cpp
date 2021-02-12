@@ -23,8 +23,8 @@ int nMapHeight = 20;
 
 // Player variables
 int FOV = 60;
-float fPlayerX = 9.0f;
-float fPlayerY = 4.0f;
+float fPlayerX = 9.6f;
+float fPlayerY = 4.2f;
 float fPlayerA = 0.0f;
 
 // Player characteristics
@@ -61,6 +61,14 @@ float constrain(float x, float lo, float hi);
 float degrees(float radians);
 // Convert from degrees to radians
 float radians(float degrees);
+
+// Struct which holds texture information
+struct texture {
+	wchar_t character;
+	int width;
+	int height;
+	wstring textureMap;
+};
 
 int main()
 {	// << I'm trying this out because I think it looks clean
@@ -134,6 +142,28 @@ int main()
 	map += L"#..................#";
 	map += L"#..................#";
 	map += L"####################";*/
+	
+	// Define my textures
+	// - = no color
+	// a = red
+	// b = blue
+	// c = green
+	// d = white
+
+	texture brickTexture;
+	brickTexture.character = L'#';
+	brickTexture.width = 10;
+	brickTexture.height = 10;
+	brickTexture.textureMap += L"daaaddaaad";
+	brickTexture.textureMap += L"daaaddaaad";
+	brickTexture.textureMap += L"dddddddddd";
+	brickTexture.textureMap += L"addaaaddaa";
+	brickTexture.textureMap += L"addaaaddaa";
+	brickTexture.textureMap += L"dddddddddd";
+	brickTexture.textureMap += L"daaaddaaad";
+	brickTexture.textureMap += L"daaaddaaad";
+	brickTexture.textureMap += L"dddddddddd";
+	brickTexture.textureMap += L"addaaaddaa";
 
 	// Place characters which represent the lights on the map
 	for (int i = 0; i < nNumberOfLights; i++)
@@ -299,10 +329,12 @@ int main()
 			// Calculates the height of the wall, the *15 is the distance to the projection plane
 			float sliceHeight = (nScreenHeight / correctedDistance) * 15;
 			int ceilingGap = int((nScreenHeight - sliceHeight) / 2);
+			int savedCeilingGap = ceilingGap;
 
 			// If the ceiling gap is less than zero, the slice takes up more than the whole screen
-			if (ceilingGap < 0) 
+			if (ceilingGap < 0)
 				ceilingGap = 0;
+			
 
 			// If the column should be blank, make it blank
 			if (blank)
@@ -311,6 +343,10 @@ int main()
 			// The purpose of the lines until the // end is to lessen visual artifacts by shifting the intersection point to the
 			// edge that it actually intersected
 			// This fixes the issue by insuring rays which double back on themselves make it out of the wall
+
+			// Used to determine whether I pass the x or y as the normX value in sampleTexture()
+			bool useXOffset = false;
+			bool useYOffset = false;
 
 			// Distance from the x intersection value and the left wall of the grid it is in
 			float xDistanceFromLeft = stepX - (int)stepX;
@@ -336,9 +372,15 @@ int main()
 
 			// Determine which coordinate is the closest to the edge and shift it towards that edge
 			if (xDistance < yDistance)
+			{
 				stepX = roundf(stepX);
+				useYOffset = true;
+			}
 			else
+			{
 				stepY = roundf(stepY);
+				useXOffset = true;
+			}
 
 			//end
 
@@ -427,6 +469,49 @@ int main()
 			// Fill the column with a slice of the appropiate height
 			for (int y = ceilingGap; y < nScreenHeight - ceilingGap; y++)
 			{
+				float normX = 0.0f;
+				float normY = (y - savedCeilingGap) / ceilf(sliceHeight);
+
+				if (useXOffset)
+					normX = stepX;
+				else if (useYOffset)
+					normX = stepY;
+
+				int color = 0;
+
+				int sampleX = int(normX * brickTexture.width + 1.0) % brickTexture.width;
+				int sampleY = int(normY * brickTexture.height);
+
+				wchar_t sampledCoords;
+				int textureIndex = sampleY * brickTexture.width + sampleX;
+				if (textureIndex >= brickTexture.width * brickTexture.height)
+					sampledCoords = L'c';
+				else
+					sampledCoords = brickTexture.textureMap[textureIndex];
+
+				switch (sampledCoords)
+				{
+					case '-':
+						color = -1;
+						break;
+					case 'a':
+						color = FOREGROUND_RED;
+						break;
+					case 'b':
+						color = FOREGROUND_BLUE;
+						break;
+					case 'c':
+						color = FOREGROUND_GREEN;
+						break;
+					case 'd':
+						color = FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_RED;
+						break;
+				}
+
+				if (color < 0)
+					continue;
+
+				screen[y * nScreenWidth + x].Attributes = color;
 				screen[y * nScreenWidth + x].Char.UnicodeChar = wShade;
 			}
 		}
@@ -440,6 +525,7 @@ int main()
 		{
 			for (int y = 0; y < nMapHeight; y++)
 			{
+				screen[y * nScreenWidth + x].Attributes = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
 				screen[y * nScreenWidth + x].Char.UnicodeChar = map[y * nMapWidth + x];
 			}
 		}
@@ -452,7 +538,6 @@ int main()
 		swprintf_s(consoleTitle, 100, L"Console Raycaster | FPS = %f", FPS);
 		SetConsoleTitle(consoleTitle);
 
-		// screen[nScreenWidth * nScreenHeight] = '\0';
 		SMALL_RECT window = { 0, 0, (short)nScreenWidth, (short)nScreenHeight };
 		WriteConsoleOutput(hConsole, screen, { (short)nScreenWidth, (short)nScreenHeight }, { 0, 0 }, &window);
 	}
