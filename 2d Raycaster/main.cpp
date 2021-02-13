@@ -416,6 +416,15 @@ int main()
 						}
 					}
 
+					for (int i = 0; i < nNumberOfTextures; i++)
+					{
+						if (textures[i].character == map[(int)stepY * nMapWidth + (int)stepX])
+						{
+							sampleTexture = &textures[i];
+							break;
+						}
+					}
+
 					hitWall = true;
 				}
 			}
