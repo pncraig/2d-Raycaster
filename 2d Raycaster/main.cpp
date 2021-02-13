@@ -18,7 +18,7 @@ int nScreenWidth = 192;
 int nScreenHeight = 96;
 float FPS;
 
-int nMapWidth = 20;
+int nMapWidth = 40;
 int nMapHeight = 20;
 
 // Player variables
@@ -37,9 +37,9 @@ int nPlayerRadius = 3;
 float deltaStep = 0.08f;
 
 // Light variables
-const int nNumberOfLights = 2;
+const int nNumberOfLights = 3;
 // Array of lights (always should have a .5 in order to increase the accuracy of rays)
-float lights[nNumberOfLights][2] = { {10.5f, 3.5f}, { 10.5f, 17.5f } };
+float lights[nNumberOfLights][2] = { {10.5f, 3.5f}, { 10.5f, 17.5f }, { 30.5f, 13.5f } };
 // Makes it easier for me to find the lightest shade because each shading value now has a corresponding integer value,
 // so I can compare shades to finding the darkest shading
 enum shade {
@@ -64,7 +64,7 @@ float radians(float degrees);
 
 // Struct which holds texture information
 struct texture {
-	wchar_t character{};
+	wchar_t character{};	// Character representation on the map
 	int width{};
 	int height{};
 	wstring textureMap{};
@@ -164,32 +164,53 @@ int main()
 	smileyTexture.textureMap += L"kkkcccckkk";
 	smileyTexture.textureMap += L"kkkkkkkkkk";
 
+	// The letter "P". Notice how this texture is larger than the other: the raycaster can handle any texture size
+	texture letterTexture;
+	letterTexture.character = L'&';
+	letterTexture.width = 15;
+	letterTexture.height = 15;
+	letterTexture.textureMap += L"iiiiiiiiiiiiiii";
+	letterTexture.textureMap += L"iibbbbbbbiiiiii";
+	letterTexture.textureMap += L"iibbiiiibbiiiii";
+	letterTexture.textureMap += L"iibbiiiiibbiiii";
+	letterTexture.textureMap += L"iibbiiiiiibiiii";
+	letterTexture.textureMap += L"iibbiiiiiibiiii";
+	letterTexture.textureMap += L"iibbiiiiiibiiii";
+	letterTexture.textureMap += L"iibbiiiiibbiiii";
+	letterTexture.textureMap += L"iibbiiiibbiiiii";
+	letterTexture.textureMap += L"iibbbbbbbiiiiii";
+	letterTexture.textureMap += L"iibbiiiiiiiiiii";
+	letterTexture.textureMap += L"iibbiiiiiiiiiii";
+	letterTexture.textureMap += L"iibbiiiiiiiiiii";
+	letterTexture.textureMap += L"iibbiiiiiiiiiii";
+	letterTexture.textureMap += L"iibbiiiiiiiiiii";
+
 	// Create an array of textures
-	const int nNumberOfTextures = 2;
-	texture textures[nNumberOfTextures] = { brickTexture, smileyTexture };
+	const int nNumberOfTextures = 3;
+	texture textures[nNumberOfTextures] = { brickTexture, smileyTexture, letterTexture };
 
 	// Create and fill a map
 	wstring map;
-	map += L"%%%%%%%%%%%%%%%%%%%%";
-	map += L"#..................#";
-	map += L"#..###........###..#";
-	map += L"#..###........###..#";
-	map += L"#..###........###..#";
-	map += L"#..................#";
-	map += L"#..................#";
-	map += L"#..................#";
-	map += L"#..................#";
-	map += L"#########......#####";
-	map += L"#..................#";
-	map += L"#..................#";
-	map += L"#..................#";
-	map += L"#....####..####....#";
-	map += L"#....#........#....#";
-	map += L"#....#........#....#";
-	map += L"#....##########....#";
-	map += L"#..................#";
-	map += L"#..................#";
-	map += L"####################";
+	map += L"%%%%%%%%%%%%%%%%%%%%####################";
+	map += L"#..................##..................#";
+	map += L"#..###........###..##..................#";
+	map += L"#..###........###..##..................#";
+	map += L"#..###........###..##..................#";
+	map += L"#..................##..................#";
+	map += L"#......................................#";
+	map += L"#..........................###.###.....#";
+	map += L"#..................##......#.....#.....#";
+	map += L"#########......######......#######.....#";
+	map += L"#..................##......#%%%%%#.....#";
+	map += L"#..................##......#.....#.....#";
+	map += L"#..................##......#.....#.....#";
+	map += L"#....####..####....##......#.....#.....#";
+	map += L"#....#........#....##......#.....#.....#";
+	map += L"#....#........#....##......#.....#.....#";
+	map += L"#....&&&&&&&&&&....##..................#";
+	map += L"#..................##..................#";
+	map += L"#..................##..................#";
+	map += L"########################################";
 
 	//map += L"####################";
 	//map += L"#..................#";
@@ -226,10 +247,10 @@ int main()
 		{
 			// Color the sky blue and the ground green
 			int backgroundColor = 0;
-			/*if (i < int(nScreenWidth * nScreenHeight / 2))
+			if (i < int(nScreenWidth * nScreenHeight / 2))
 				backgroundColor = BACKGROUND_BLUE | BACKGROUND_INTENSITY;
 			else
-				backgroundColor = BACKGROUND_GREEN;*/
+				backgroundColor = BACKGROUND_GREEN;
 
 			screen[i].Char.UnicodeChar = L' ';
 			screen[i].Attributes = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | backgroundColor;
@@ -348,7 +369,7 @@ int main()
 												#====================#
 		*/
 		// Cast a ray for each column on screen
-		for (int x = 0; x < nScreenWidth; x++) 
+		for (int x = 0; x < nScreenWidth; x++)
 		{
 			// Determine the angle of the ray by moving to the far left of the screen, and moving the angle forward by the 
 			// field of view divided by the width, to the get the change for an increase of 1 in x, times x, to get the 
@@ -366,7 +387,7 @@ int main()
 			float stepY = fPlayerY;
 
 			// Stores the texture of the wall type
-			texture* sampleTexture = &brickTexture;
+			texture* sampleTexture{};
 
 			// If a wall is hit, end loop. Otherwise, keep adding to the stepX and stepY coordinates to find a wall
 			while (!hitWall)
@@ -383,7 +404,16 @@ int main()
 						((double)stepX - (int)stepX < 0.08 && (double)stepY - (int)stepY > 0.92) ||
 						((double)stepX - (int)stepX > 0.92 && (double)stepY - (int)stepY < 0.08))
 					{
-						blank = true;
+						// blank = true;
+					}
+
+					for (int i = 0; i < nNumberOfTextures; i++)
+					{
+						if (textures[i].character == map[(int)stepY * nMapWidth + (int)stepX])
+						{
+							sampleTexture = &textures[i];
+							break;
+						}
 					}
 
 					for (int i = 0; i < nNumberOfTextures; i++)
@@ -566,23 +596,23 @@ int main()
 				// Because texturing is based on what the player sees (meaning a pseudo 3d wall), we need to decide whether to use
 				// the x or y coordinates of the intersection point to determine the texture column to use
 				if (useXOffset)
-					normX = stepX;
+					normX = stepX - (int)stepX;
 				else if (useYOffset)
-					normX = stepY;
+					normX = stepY - (int)stepY;
 
 				// The to be color of the current character cell
 				int color = 0;
 
 				// Use the modulus operator to determine the x of the texture sample
-				int sampleX = int(normX * sampleTexture->width) % sampleTexture->width;
+				int sampleX = int(normX * sampleTexture->width);
 				int sampleY = int(normY * sampleTexture->height);
 				
 				// The character at the sampled texture coords
 				wchar_t sampledCoords;
 				
 				// Failsafe to prevent the program from accessing a character value that doesn't exist
-				int textureIndex = sampleY * brickTexture.width + sampleX;
-				if (textureIndex >= brickTexture.width * brickTexture.height)
+				int textureIndex = sampleY * sampleTexture->width + sampleX;
+				if (textureIndex >= sampleTexture->width * sampleTexture->height)
 					sampledCoords = L'c';
 				else
 					sampledCoords = sampleTexture->textureMap[textureIndex];
