@@ -26,9 +26,9 @@ int nMapHeight = 20;
 
 // Player variables
 int FOV = 60;
-float fPlayerX = 9.6f;
-float fPlayerY = 4.2f;
-float fPlayerA = 0.0f;
+float fPlayerX = 10.0f;
+float fPlayerY = 10.0f;
+float fPlayerA = 270.0f;
 
 // Player characteristics
 float fPlayerVel = 5.0f;
@@ -97,8 +97,9 @@ int interpretSample(wchar_t sampleCoords);
 struct sprite {
 	float x{};
 	float y{};
+	int width{};
+	int height{};
 	texture spriteMap;
-	float r{};
 };
 
 int main()
@@ -129,6 +130,9 @@ int main()
 	// Initialize two timepoints
 	auto tp1 = chrono::system_clock::now();
 	auto tp2 = chrono::system_clock::now();
+
+	// Create a z-buffer
+	float* depthBuffer = new float[nScreenWidth];
 
 	// Define my textures
 	/*
@@ -225,19 +229,14 @@ int main()
 	lampTexture.textureMap += L"----------";
 
 	// Define a sprite. Sprites use textures to display themselves, so we use the color table used for the spriteMap
-	sprite lampSprite;
-	lampSprite.x = 38.0f;
-	lampSprite.y = 2.0f;
-	lampSprite.r = 0.3f;
-	lampSprite.spriteMap = lampTexture;
-
-	vector<sprite> sprites(2);
-	for (int i = 0; i < 10; i++)
+	vector<sprite> sprites;
+	for (int i = 0; i < 1; i++)
 	{
 		sprite lampSprite;
-		lampSprite.x = (float)i * 2.0f + 3.0f;
+		lampSprite.x = 10.0f;
 		lampSprite.y = 6.0f;
-		lampSprite.r = 0.3f;
+		lampSprite.width = 10;
+		lampSprite.height = 40;
 		lampSprite.spriteMap = lampTexture;
 
 		sprites.push_back(lampSprite);
@@ -484,6 +483,9 @@ int main()
 			// Completely fixes distortion and makes the result just look better
 			distance *= nGridSize;
 
+			// Collect the distance in the z-buffer for drawing the sprites
+			depthBuffer[x] = distance;
+
 			// Correct the fish eye effect
 			float correctedDistance = distance * cosf(radians(fPlayerA - rayAngle));
 
@@ -676,134 +678,67 @@ int main()
 				screen[y * nScreenWidth + x].Attributes = color;
 				screen[y * nScreenWidth + x].Char.UnicodeChar = wShade;
 			}
+		}
 
+		for (int i = 0; i < (signed)sprites.size(); i++)
+		{
+			float opposite = sprites[i].x - fPlayerX;
+			float adjacent = sprites[i].y - fPlayerY;
 
-			float entrancePointX = 0;
-			float entrancePointY = 0;
+			// Get the angle between the sprite and the player
+			float spriteAngle = degrees(atan2f(adjacent, opposite));
+			spriteAngle = loopAngle(spriteAngle);	// atan2f was returning negative angles, which I thought it wasn't supposed to
 
-			float exitPointX = 0;
-			float exitPointY = 0;
+			float angleFromPlayer = fPlayerA + (FOV / 2) - spriteAngle;
+			int spriteX = nScreenWidth - int((angleFromPlayer) / FOV * nScreenWidth);
 
-			sprite* intersectedSprite{};
+			// Get the distance to the sprite
+			float distFromSprite = sqrtf(opposite * opposite + adjacent * adjacent);
 
-			// Tells the loop to exit because a sprite has been hit
-			bool hitSprite = false;
+			distFromSprite *= nGridSize;
 
-			for (int i = 0; i < (signed)sprites.size(); i++)
+			float spriteHeight = (nScreenHeight / distFromSprite) * nDistFromProjPlane;
+			int ceilingGap = int((nScreenHeight - spriteHeight) / 2);
+			int savedCeilingGap = ceilingGap;
+
+			if (ceilingGap < 0)
+				ceilingGap = 0;
+
+			float spriteWidth = (sprites[i].width * spriteHeight) / sprites[i].height;
+			int halfWidth = int(spriteWidth / 2);
+
+			int spriteStart = spriteX - halfWidth;
+			int spriteEnd = spriteX + halfWidth;
+
+			if (spriteStart < 0)
+				spriteStart = 0;
+
+			if (spriteEnd > nScreenWidth)
+				spriteEnd = nScreenWidth;
+
+			for (int x = spriteStart; x < spriteEnd; x++)
 			{
-				// I use the same deltaX, deltaY values as in lines 412 & 413. I also use the same rayAngle variable
-				// I do create a new copy of the player coordinates
-				float spriteStepX = fPlayerX;
-				float spriteStepY = fPlayerY;
-
-				bool isInside = false;
-
-				while (!hitSprite)
-				{
-					spriteStepX += deltaX;
-					spriteStepY += deltaY;
-
-					// If the ray hits a wall before it enters the circle of a sprite, end the casting
-					if (map[(int)spriteStepY * nMapWidth + (int)spriteStepX] != '.' && map[(int)spriteStepY * nMapWidth + (int)spriteStepX] != 'O' && !isInside)
-					{
-						break;
-					}
-
-					// If the ray hasn't hit a sprite circle yet, check if it has entered
-					if (!isInside)
-					{
-						float distX = spriteStepX - sprites[i].x;
-						float distY = spriteStepY - sprites[i].y;
-
-						// Optimization so that I only have to get the exact distance when I need to
-						/*if (abs(distX) > sprites[i].r && abs(distY) > sprites[i].r)
-							continue;*/
-
-						// Calculate distance
-						float distance = sqrtf(distX * distX + distY * distY);
-						// If the ray has intersected the sprite circle...
-						if (distance < sprites[i].r)
-						{
-							// Get the point of intersection for future calculations
-							entrancePointX = spriteStepX;
-							entrancePointY = spriteStepY;
-							// The ray entered the circle, so we want to check for the exit point now
-							isInside = true;
-						}
-					}
-
-					// This chunk of code checks for when the ray exits the sprite circle
-					if (isInside)
-					{
-						float distX = spriteStepX - sprites[i].x;
-						float distY = spriteStepY - sprites[i].y;
-
-						// Similar optimization to the one above
-						/*if (abs(distX) < sprites[i].r && abs(distY) < sprites[i].r)
-							continue;*/
-
-						// Calculate distance
-						float distance = sqrtf(distX * distX + distY * distY);
-						// Does the same thing as the above segment of code, except stores the exit point and leaves the loop
-						if (distance > sprites[i].r)
-						{
-							exitPointX = spriteStepX;
-							exitPointY = spriteStepY;
-							intersectedSprite = &sprites[i];
-							hitSprite = true;
-						}
-					}
-				}
-
-				if (hitSprite)
-					break;
-			}
-
-			// If the variables haven't been filled, skip
-			if (entrancePointX == 0)
-				continue;
-
-			// Use the midpoint formula to get useable points
-			float midPointX = (entrancePointX + exitPointX) * 0.5f;
-			float midPointY = (entrancePointY + exitPointY) * 0.5f;
-
-			// If the useable points end up in a wall, don't draw the sprite slice
-			if (map[(int)midPointY * nMapWidth + (int)midPointX] != '.' && map[(int)midPointY * nMapWidth + (int)midPointX] != 'O')
-				continue;
-
-			// Find the distance from the player to the sprite
-			float a2 = midPointX - fPlayerX;
-			float b2 = midPointY - fPlayerY;
-			float distFromSprite = sqrtf(a2 * a2 + b2 * b2) * nGridSize;
-
-			// Correct the fisheye effect
-			float correctedDistFromSprite = distFromSprite * cosf(radians(fPlayerA - rayAngle));
-
-			// Calculate the height of the slice (very similar to what is done for the walls
-			float spriteSliceHeight = (nScreenHeight / correctedDistFromSprite) * nDistFromProjPlane;
-			int spriteCeilingGap = int((nScreenHeight - spriteSliceHeight) / 2);
-			int savedSpriteCeilingGap = spriteCeilingGap;
-
-			if (spriteCeilingGap < 0)
-				spriteCeilingGap = 0;
-
-			for (int y = spriteCeilingGap; y < nScreenHeight - spriteCeilingGap; y++)
-			{
-				float normX = 0.5f;
-				float normY = (y - savedSpriteCeilingGap) / (spriteSliceHeight + 1.0);
-
-				int sampleX = int(normX * intersectedSprite->spriteMap.width);
-				int sampleY = int(normY * intersectedSprite->spriteMap.height);
-
-				wchar_t sampledCoords = intersectedSprite->spriteMap.textureMap[sampleY * intersectedSprite->spriteMap.width + sampleX];
-
-				int color = interpretSample(sampledCoords);
-
-				if (color < 0)
+				if (distFromSprite > depthBuffer[x])
 					continue;
 
-				screen[y * nScreenWidth + x].Attributes = color;
-				screen[y * nScreenWidth + x].Char.UnicodeChar = L'\u2588';
+				for (int y = ceilingGap; y < nScreenHeight - ceilingGap; y++)
+				{
+					/*float normX = (x - spriteStart) / spriteWidth;
+					float normY = (y - savedCeilingGap) / spriteHeight;
+
+					int sampleX = int(normX * sprites[i].spriteMap.width);
+					int sampleY = int(normY * sprites[i].spriteMap.height);
+
+					wchar_t sampleCoords = sprites[i].spriteMap.textureMap[sampleY * sprites[i].spriteMap.width + sampleX];
+
+					int color = interpretSample(sampleCoords);
+
+					if (color < 0)
+						continue;*/
+
+					screen[y * nScreenWidth + x].Attributes = 8;
+					screen[y * nScreenWidth + x].Char.UnicodeChar = L'\u2588';
+				}
 			}
 		}
 
@@ -892,11 +827,16 @@ int interpretSample(wchar_t sampledCoords)
 
 float loopAngle(float angle)
 {
-	if (angle > 360)
-		return angle - 360;
-	else if (angle <= 0)
-		return angle + 360;
-	else return angle;
+	if (angle >= 0.0f && angle < 360.0f)
+		return angle;
+	
+	while (angle >= 360.0f)
+		angle -= 360.0f;
+
+	while (angle < 0.0f)
+		angle += 360.0f;
+
+	return angle;
 }
 
 float constrain(float x, float lo, float hi)
