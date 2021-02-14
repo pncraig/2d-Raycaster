@@ -9,6 +9,7 @@
 #include <sstream>
 #include <cmath>
 #include <chrono>
+#include <vector>
 using namespace std;
 
 #define PI 3.1415926535
@@ -17,6 +18,8 @@ using namespace std;
 int nScreenWidth = 192;
 int nScreenHeight = 96;
 float FPS;
+int nGridSize = 10;
+int nDistFromProjPlane = 15;
 
 int nMapWidth = 40;
 int nMapHeight = 20;
@@ -62,12 +65,40 @@ float degrees(float radians);
 // Convert from degrees to radians
 float radians(float degrees);
 
+// Variables which associate a color with a character (used to interpret a texture)
+const char cNoColor = '-';
+const char cRed = 'a';
+const char cBlue = 'b';
+const char cGreen = 'c';
+const char cPurple = 'd';
+const char cYellow = 'e';
+const char cLightBlue = 'f';
+const char cPink = 'g';
+const char cLightGreen = 'h';
+const char cPastel = 'i';
+const char cCyan = 'j';
+const char cWhite = 'k';
+const char cGray = 'l';
+const char cBrightWhite = 'm';
+const char cBlack = 'n';
+
 // Struct which holds texture information
 struct texture {
 	wchar_t character{};	// Character representation on the map
 	int width{};
 	int height{};
 	wstring textureMap{};
+};
+
+// Takes a character from a texture and returns the corresponding color
+int interpretSample(wchar_t sampleCoords);
+
+// Struct which holds sprite information
+struct sprite {
+	float x{};
+	float y{};
+	texture spriteMap;
+	float r{};
 };
 
 int main()
@@ -115,22 +146,11 @@ int main()
 											|	i = pastel				   |
 											|	j = cyan				   |
 											|	k = white				   |
+											|	l = gray				   |
+											|	m = bright white		   |
+											|	n = black				   |
 											#==============================#
 	*/
-
-	// Variables which associate a color with a character
-	const char cNoColor = '-';
-	const char cRed = 'a';
-	const char cBlue = 'b';
-	const char cGreen = 'c';
-	const char cPurple = 'd';
-	const char cYellow = 'e';
-	const char cLightBlue = 'f';
-	const char cPink = 'g';
-	const char cLightGreen = 'h';
-	const char cPastel = 'i';
-	const char cCyan = 'j';
-	const char cWhite = 'k';
 
 	// Simple red brick texture
 	texture brickTexture;
@@ -188,6 +208,41 @@ int main()
 	// Create an array of textures
 	const int nNumberOfTextures = 3;
 	texture textures[nNumberOfTextures] = { brickTexture, smileyTexture, letterTexture };
+
+	// Sprite textures
+	texture lampTexture;
+	lampTexture.width = 10;
+	lampTexture.height = 10;
+	lampTexture.textureMap += L"----------";
+	lampTexture.textureMap += L"---llll---";
+	lampTexture.textureMap += L"---eeee---";
+	lampTexture.textureMap += L"--leeeel--";
+	lampTexture.textureMap += L"---llll---";
+	lampTexture.textureMap += L"----ll----";
+	lampTexture.textureMap += L"----ll----";
+	lampTexture.textureMap += L"----ll----";
+	lampTexture.textureMap += L"---llll---";
+	lampTexture.textureMap += L"----------";
+
+	// Define a sprite. Sprites use textures to display themselves, so we use the color table used for the spriteMap
+	sprite lampSprite;
+	lampSprite.x = 38.0f;
+	lampSprite.y = 2.0f;
+	lampSprite.r = 0.3f;
+	lampSprite.spriteMap = lampTexture;
+
+	vector<sprite> sprites(2);
+	for (int i = 0; i < 10; i++)
+	{
+		sprite lampSprite;
+		lampSprite.x = (float)i * 2.0f + 3.0f;
+		lampSprite.y = 6.0f;
+		lampSprite.r = 0.3f;
+		lampSprite.spriteMap = lampTexture;
+
+		sprites.push_back(lampSprite);
+	}
+
 
 	// Create and fill a map
 	wstring map;
@@ -378,7 +433,7 @@ int main()
 			bool hitWall = false;
 			bool blank = false;
 
-			// Find the x and y step lengths based on the length of a step use soh cah toa
+			// Find the x and y step lengths based on the length of a step using soh cah toa
 			float deltaX = deltaStep * cosf(radians(rayAngle));
 			float deltaY = deltaStep * sinf(radians(rayAngle));
 
@@ -407,15 +462,7 @@ int main()
 						// blank = true;
 					}
 
-					for (int i = 0; i < nNumberOfTextures; i++)
-					{
-						if (textures[i].character == map[(int)stepY * nMapWidth + (int)stepX])
-						{
-							sampleTexture = &textures[i];
-							break;
-						}
-					}
-
+					// Find out which type of wall the ray is intersecting and set the texture accordingly
 					for (int i = 0; i < nNumberOfTextures; i++)
 					{
 						if (textures[i].character == map[(int)stepY * nMapWidth + (int)stepX])
@@ -435,14 +482,15 @@ int main()
 			float distance = sqrtf(a * a + b * b);
 			// The multiplication makes the distance what it would've been if the grid squares were ten units wide instead of one
 			// Completely fixes distortion and makes the result just look better
-			distance *= 10;
+			distance *= nGridSize;
 
 			// Correct the fish eye effect
 			float correctedDistance = distance * cosf(radians(fPlayerA - rayAngle));
 
 			// Calculates the height of the wall, the *15 is the distance to the projection plane
-			float sliceHeight = (nScreenHeight / correctedDistance) * 15;
+			float sliceHeight = (nScreenHeight / correctedDistance) * nDistFromProjPlane;
 			int ceilingGap = int((nScreenHeight - sliceHeight) / 2);
+			// Used for determining the y coordinate for texturing
 			int savedCeilingGap = ceilingGap;
 
 			// If the ceiling gap is less than zero, the slice takes up more than the whole screen
@@ -618,45 +666,7 @@ int main()
 					sampledCoords = sampleTexture->textureMap[textureIndex];
 
 				// Find the matching color for the texture sample
-				switch (sampledCoords)
-				{
-					case cNoColor:
-						color = -1;
-						break;
-					case cRed:
-						color = FOREGROUND_RED;
-						break;
-					case cBlue:
-						color = FOREGROUND_BLUE;
-						break;
-					case cGreen:
-						color = FOREGROUND_GREEN;
-						break;
-					case cPurple:
-						color = FOREGROUND_RED | FOREGROUND_BLUE;
-						break;
-					case cYellow:
-						color = FOREGROUND_RED | FOREGROUND_GREEN;
-						break;
-					case cLightBlue:
-						color = FOREGROUND_BLUE | FOREGROUND_GREEN;
-						break;
-					case cPink:
-						color = FOREGROUND_RED | FOREGROUND_INTENSITY;
-						break;
-					case cLightGreen:
-						color = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
-						break;
-					case cPastel:
-						color = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY;
-						break;
-					case cCyan:
-						color = FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
-						break;
-					case cWhite:
-						color = FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_RED;
-						break;
-				}
+				color = interpretSample(sampledCoords);
 
 				// If there should be no color, skip coloring the character
 				if (color < 0)
@@ -665,6 +675,135 @@ int main()
 				// Color the character and update its unicode character
 				screen[y * nScreenWidth + x].Attributes = color;
 				screen[y * nScreenWidth + x].Char.UnicodeChar = wShade;
+			}
+
+
+			float entrancePointX = 0;
+			float entrancePointY = 0;
+
+			float exitPointX = 0;
+			float exitPointY = 0;
+
+			sprite* intersectedSprite{};
+
+			// Tells the loop to exit because a sprite has been hit
+			bool hitSprite = false;
+
+			for (int i = 0; i < (signed)sprites.size(); i++)
+			{
+				// I use the same deltaX, deltaY values as in lines 412 & 413. I also use the same rayAngle variable
+				// I do create a new copy of the player coordinates
+				float spriteStepX = fPlayerX;
+				float spriteStepY = fPlayerY;
+
+				bool isInside = false;
+
+				while (!hitSprite)
+				{
+					spriteStepX += deltaX;
+					spriteStepY += deltaY;
+
+					// If the ray hits a wall before it enters the circle of a sprite, end the casting
+					if (map[(int)spriteStepY * nMapWidth + (int)spriteStepX] != '.' && map[(int)spriteStepY * nMapWidth + (int)spriteStepX] != 'O' && !isInside)
+					{
+						break;
+					}
+
+					// If the ray hasn't hit a sprite circle yet, check if it has entered
+					if (!isInside)
+					{
+						float distX = spriteStepX - sprites[i].x;
+						float distY = spriteStepY - sprites[i].y;
+
+						// Optimization so that I only have to get the exact distance when I need to
+						/*if (abs(distX) > sprites[i].r && abs(distY) > sprites[i].r)
+							continue;*/
+
+						// Calculate distance
+						float distance = sqrtf(distX * distX + distY * distY);
+						// If the ray has intersected the sprite circle...
+						if (distance < sprites[i].r)
+						{
+							// Get the point of intersection for future calculations
+							entrancePointX = spriteStepX;
+							entrancePointY = spriteStepY;
+							// The ray entered the circle, so we want to check for the exit point now
+							isInside = true;
+						}
+					}
+
+					// This chunk of code checks for when the ray exits the sprite circle
+					if (isInside)
+					{
+						float distX = spriteStepX - sprites[i].x;
+						float distY = spriteStepY - sprites[i].y;
+
+						// Similar optimization to the one above
+						/*if (abs(distX) < sprites[i].r && abs(distY) < sprites[i].r)
+							continue;*/
+
+						// Calculate distance
+						float distance = sqrtf(distX * distX + distY * distY);
+						// Does the same thing as the above segment of code, except stores the exit point and leaves the loop
+						if (distance > sprites[i].r)
+						{
+							exitPointX = spriteStepX;
+							exitPointY = spriteStepY;
+							intersectedSprite = &sprites[i];
+							hitSprite = true;
+						}
+					}
+				}
+
+				if (hitSprite)
+					break;
+			}
+
+			// If the variables haven't been filled, skip
+			if (entrancePointX == 0)
+				continue;
+
+			// Use the midpoint formula to get useable points
+			float midPointX = (entrancePointX + exitPointX) * 0.5f;
+			float midPointY = (entrancePointY + exitPointY) * 0.5f;
+
+			// If the useable points end up in a wall, don't draw the sprite slice
+			if (map[(int)midPointY * nMapWidth + (int)midPointX] != '.' && map[(int)midPointY * nMapWidth + (int)midPointX] != 'O')
+				continue;
+
+			// Find the distance from the player to the sprite
+			float a2 = midPointX - fPlayerX;
+			float b2 = midPointY - fPlayerY;
+			float distFromSprite = sqrtf(a2 * a2 + b2 * b2) * nGridSize;
+
+			// Correct the fisheye effect
+			float correctedDistFromSprite = distFromSprite * cosf(radians(fPlayerA - rayAngle));
+
+			// Calculate the height of the slice (very similar to what is done for the walls
+			float spriteSliceHeight = (nScreenHeight / correctedDistFromSprite) * nDistFromProjPlane;
+			int spriteCeilingGap = int((nScreenHeight - spriteSliceHeight) / 2);
+			int savedSpriteCeilingGap = spriteCeilingGap;
+
+			if (spriteCeilingGap < 0)
+				spriteCeilingGap = 0;
+
+			for (int y = spriteCeilingGap; y < nScreenHeight - spriteCeilingGap; y++)
+			{
+				float normX = 0.5f;
+				float normY = (y - savedSpriteCeilingGap) / (spriteSliceHeight + 1.0);
+
+				int sampleX = int(normX * intersectedSprite->spriteMap.width);
+				int sampleY = int(normY * intersectedSprite->spriteMap.height);
+
+				wchar_t sampledCoords = intersectedSprite->spriteMap.textureMap[sampleY * intersectedSprite->spriteMap.width + sampleX];
+
+				int color = interpretSample(sampledCoords);
+
+				if (color < 0)
+					continue;
+
+				screen[y * nScreenWidth + x].Attributes = color;
+				screen[y * nScreenWidth + x].Char.UnicodeChar = L'\u2588';
 			}
 		}
 
@@ -696,6 +835,59 @@ int main()
 	}
 
 	return 0;
+}
+
+int interpretSample(wchar_t sampledCoords)
+{
+	switch(sampledCoords)
+	{
+		case cNoColor:
+			return -1;
+			break;
+		case cRed:
+			return  FOREGROUND_RED;
+			break;
+		case cBlue:
+			return FOREGROUND_BLUE;
+			break;
+		case cGreen:
+			return FOREGROUND_GREEN;
+			break;
+		case cPurple:
+			return FOREGROUND_RED | FOREGROUND_BLUE;
+			break;
+		case cYellow:
+			return FOREGROUND_RED | FOREGROUND_GREEN;
+			break;
+		case cLightBlue:
+			return FOREGROUND_BLUE | FOREGROUND_GREEN;
+			break;
+		case cPink:
+			return FOREGROUND_RED | FOREGROUND_INTENSITY;
+			break;
+		case cLightGreen:
+			return FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+			break;
+		case cPastel:
+			return FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+			break;
+		case cCyan:
+			return FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+			break;
+		case cWhite:
+			return FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_RED;
+			break;
+		case cGray:
+			return 8;
+			break;
+		case cBrightWhite:
+			return FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+			break;
+		case cBlack:
+			return 0;
+			break;
+	}
+	return -1;
 }
 
 float loopAngle(float angle)
