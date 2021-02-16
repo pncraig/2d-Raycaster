@@ -18,17 +18,18 @@ using namespace std;
 int nScreenWidth = 192;
 int nScreenHeight = 96;
 float FPS;
-int nGridSize = 10;
-int nDistFromProjPlane = 15;
 
-int nMapWidth = 40;
-int nMapHeight = 20;
+int nMapWidth = 40;		// Map width
+int nMapHeight = 20;	// Map height
 
 // Player variables
-int FOV = 60;
-float fPlayerX = 10.0f;
-float fPlayerY = 10.0f;
-float fPlayerA = 270.0f;
+int FOV = 60;					// Field of view
+float fDOV = 10.0f;				// Depth of veiw
+float fPlayerX;					// Player X
+float fPlayerY ;				// Player Y
+float fPlayerA = 0.0f;			// Player angle
+int nGridSize = 10;				// Distance value is multiplied by this number
+int nDistFromProjPlane = 30;	// Slice height is multiplied by this number
 
 // Player characteristics
 float fPlayerVel = 5.0f;
@@ -39,10 +40,6 @@ int nPlayerRadius = 3;
 // The length of the step in between ray-wall checks 
 float deltaStep = 0.08f;
 
-// Light variables
-const int nNumberOfLights = 3;
-// Array of lights (always should have a .5 in order to increase the accuracy of rays)
-float lights[nNumberOfLights][2] = { {10.5f, 3.5f}, { 10.5f, 17.5f }, { 30.5f, 13.5f } };
 // Makes it easier for me to find the lightest shade because each shading value now has a corresponding integer value,
 // so I can compare shades to finding the darkest shading
 enum shade {
@@ -50,6 +47,11 @@ enum shade {
 	medium,
 	dark,
 	full
+};
+// A structure that defines where a light is 
+struct lamp {
+	float x;
+	float y;
 };
 // Holds the possible shades for easy access
 wchar_t shades[4] = { L'\u2591', L'\u2592', L'\u2593', L'\u2588' };
@@ -95,12 +97,19 @@ int interpretSample(wchar_t sampleCoords);
 
 // Struct which holds sprite information
 struct sprite {
+	wchar_t character{};
 	float x{};
 	float y{};
-	int width{};
-	int height{};
+	float width{};
+	float height{};
+	float distFromPlayer{};
 	texture spriteMap;
 };
+
+// Taking a vector of sprites, sorts them from smallest distFromPlayer to largest distFromPlayer
+void sort(vector<sprite>& sprites);
+
+bool characterInString(wchar_t character, wstring& str);
 
 int main()
 {	// << I'm trying this out because I think it looks clean
@@ -209,89 +218,146 @@ int main()
 	letterTexture.textureMap += L"iibbiiiiiiiiiii";
 	letterTexture.textureMap += L"iibbiiiiiiiiiii";
 
+	texture windowTexture;
+	windowTexture.character = L'$';
+	windowTexture.width = 10;
+	windowTexture.height = 10;
+	windowTexture.textureMap += L"kaaakkaaak";
+	windowTexture.textureMap += L"kaaakkaaak";
+	windowTexture.textureMap += L"kllllllllk";
+	windowTexture.textureMap += L"al--ll--la";
+	windowTexture.textureMap += L"al--ll--la";
+	windowTexture.textureMap += L"kllllllllk";
+	windowTexture.textureMap += L"kl--ll--lk";
+	windowTexture.textureMap += L"kllllllllk";
+	windowTexture.textureMap += L"kkkkkkkkkk";
+	windowTexture.textureMap += L"akkaaakkaa";
+
 	// Create an array of textures
-	const int nNumberOfTextures = 3;
-	texture textures[nNumberOfTextures] = { brickTexture, smileyTexture, letterTexture };
+	const int nNumberOfTextures = 4;
+	texture textures[nNumberOfTextures] = { brickTexture, smileyTexture, letterTexture, windowTexture };
 
 	// Sprite textures
 	texture lampTexture;
-	lampTexture.width = 10;
-	lampTexture.height = 10;
-	lampTexture.textureMap += L"----------";
-	lampTexture.textureMap += L"---llll---";
-	lampTexture.textureMap += L"---eeee---";
-	lampTexture.textureMap += L"--leeeel--";
-	lampTexture.textureMap += L"---llll---";
-	lampTexture.textureMap += L"----ll----";
-	lampTexture.textureMap += L"----ll----";
-	lampTexture.textureMap += L"----ll----";
-	lampTexture.textureMap += L"---llll---";
-	lampTexture.textureMap += L"----------";
+	lampTexture.character = L'*';
+	lampTexture.width = 20;
+	lampTexture.height = 20;
+	lampTexture.textureMap += L"--------------------";
+	lampTexture.textureMap += L"--------------------";
+	lampTexture.textureMap += L"------llllllll------";
+	lampTexture.textureMap += L"----llliilliilll----";
+	lampTexture.textureMap += L"---lliiiilliiiill---";
+	lampTexture.textureMap += L"---llllllllllllll---";
+	lampTexture.textureMap += L"---lliiiilliiiill---";
+	lampTexture.textureMap += L"----llllllllllll----";
+	lampTexture.textureMap += L"------llllllll------";
+	lampTexture.textureMap += L"--------llll--------";
+	lampTexture.textureMap += L"--------llll--------";
+	lampTexture.textureMap += L"--------llll--------";
+	lampTexture.textureMap += L"--------llll--------";
+	lampTexture.textureMap += L"--------llll--------";
+	lampTexture.textureMap += L"--------llll--------";
+	lampTexture.textureMap += L"------llllllll------";
+	lampTexture.textureMap += L"----llllllllllll----";
+	lampTexture.textureMap += L"----llllllllllll----";
+	lampTexture.textureMap += L"--------------------";
+	lampTexture.textureMap += L"--------------------";
 
 	// Define a sprite. Sprites use textures to display themselves, so we use the color table used for the spriteMap
-	vector<sprite> sprites;
-	for (int i = 0; i < 1; i++)
-	{
-		sprite lampSprite;
-		lampSprite.x = 10.0f;
-		lampSprite.y = 6.0f;
-		lampSprite.width = 10;
-		lampSprite.height = 40;
-		lampSprite.spriteMap = lampTexture;
+	
+	sprite lampSprite;
+	lampSprite.character = L'O';
+	lampSprite.x;
+	lampSprite.y;
+	lampSprite.width = 0.75f;
+	lampSprite.height = 1.5f;
+	lampSprite.distFromPlayer = 0.0f;
+	lampSprite.spriteMap = lampTexture;
 
-		sprites.push_back(lampSprite);
-	}
+	const int nNumberOfSpriteTypes = 1;
+	sprite spriteTypes[nNumberOfSpriteTypes] = { lampSprite };
 
 
 	// Create and fill a map
 	wstring map;
-	map += L"%%%%%%%%%%%%%%%%%%%%####################";
+	map += L"%%%%%%%%%%%%%%%%%%%%######$#######$#####";
 	map += L"#..................##..................#";
 	map += L"#..###........###..##..................#";
-	map += L"#..###........###..##..................#";
+	map += L"#..###....O...###..##..................#";
 	map += L"#..###........###..##..................#";
 	map += L"#..................##..................#";
-	map += L"#......................................#";
+	map += L"#..........P...........................#";
 	map += L"#..........................###.###.....#";
 	map += L"#..................##......#.....#.....#";
 	map += L"#########......######......#######.....#";
 	map += L"#..................##......#%%%%%#.....#";
 	map += L"#..................##......#.....#.....#";
 	map += L"#..................##......#.....#.....#";
-	map += L"#....####..####....##......#.....#.....#";
+	map += L"#....####..####....##......#..O..#.....#";
 	map += L"#....#........#....##......#.....#.....#";
 	map += L"#....#........#....##......#.....#.....#";
 	map += L"#....&&&&&&&&&&....##..................#";
-	map += L"#..................##..................#";
+	map += L"#.........O........##..................#";
 	map += L"#..................##..................#";
 	map += L"########################################";
 
-	//map += L"####################";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#......#######.....#";
-	//map += L"#......#######.....#";
-	//map += L"#......#######.....#";
-	//map += L"#......#######.....#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"#..................#";
-	//map += L"####################";
+	vector<lamp> lights;
+	vector<sprite> sprites;
+	wstring nonWallCharacters = L"PO.";
 
-	// Place characters which represent the lights on the map
-	for (int i = 0; i < nNumberOfLights; i++)
+	for (int x = 0; x < nMapWidth; x++)
 	{
-		map[(int)lights[i][1] * nMapWidth + (int)lights[i][0]] = L'O';
+		
+		for (int y = 0; y < nMapHeight; y++)
+		{
+			bool isTexture = false;
+			wchar_t currentChar = map[y * nMapWidth + x];
+
+			for (int i = 0; i < nNumberOfTextures; i++)
+			{
+				if (currentChar == textures[i].character)
+				{
+					isTexture = true;
+					break;
+				}
+			}
+
+			if (isTexture)
+				continue;
+
+			for (int i = 0; i < nNumberOfSpriteTypes; i++)
+			{
+				if (currentChar == spriteTypes[i].character && currentChar != 'O')
+				{
+					if(characterInString(currentChar, nonWallCharacters))
+						nonWallCharacters += spriteTypes[i].character;
+
+					sprite newSprite = spriteTypes[i];
+					newSprite.x = (float)x + 0.5f;
+					newSprite.y = (float)y + 0.5f;
+					sprites.push_back(newSprite);
+				}
+			}
+
+			switch (currentChar)
+			{
+				case 'P':
+					fPlayerX = (float)x;
+					fPlayerY = (float)y;
+					break;
+				case 'O':
+					lights.push_back({ (float)x + 0.5f, (float)y + 0.5f });
+
+					sprite newLampSprite = lampSprite;
+					newLampSprite.x = (float)x + 0.5f;
+					newLampSprite.y = (float)y + 0.5f;
+					sprites.push_back(newLampSprite);
+					break;
+			}
+		}
 	}
+
+	map[(int)fPlayerY * nMapWidth + (int)fPlayerX] = L'.';
 
 	// Infinite loop!
 	for (;;)
@@ -326,7 +392,7 @@ int main()
 			fPlayerA += float(fPlayerTurnSpeed * fElapsedTime);
 
 		// Keeps the player angle from getting too large
-		fPlayerA = loopAngle(fPlayerA);
+		// fPlayerA = loopAngle(fPlayerA);
 
 		// Determines what the x and y steps are for the player based on the angle of the player and their velocity
 		float playerVelX = fPlayerVel * cosf(radians(fPlayerA)) * fElapsedTime;
@@ -337,13 +403,28 @@ int main()
 		{
 			fPlayerX += playerVelX;
 			fPlayerY += playerVelY;
+
+			if (!characterInString(map[(int)fPlayerY * nMapWidth + (int)fPlayerX], nonWallCharacters))
+			{
+				fPlayerX -= playerVelX;
+				fPlayerY -= playerVelY;
+			}
 		}
 
 		if (GetAsyncKeyState((unsigned)'S') & 0x8000)
 		{
 			fPlayerX -= playerVelX;
 			fPlayerY -= playerVelY;
+
+
+			if (!characterInString(map[(int)fPlayerY * nMapWidth + (int)fPlayerX], nonWallCharacters))
+			{
+				fPlayerX += playerVelX;
+				fPlayerY += playerVelY;
+			}
 		}
+
+		
 
 		/*
 												#====================#
@@ -354,62 +435,62 @@ int main()
 		*/
 
 
-		// I'd like to figure out how to improve this collision system
-		// Variables that will be filled with info from the ray with the longest length
-		float maxDistance = -FLT_MAX;
-		float intersectX = fPlayerX;
-		float intersectY = fPlayerY;
-		// Cast a ray out in a circle around the player
-		for (int angle = 0; angle < 360; angle += 20)
-		{
-			bool missedWall = true;
-			
-			// Get the individual components of the ray slope
-			float deltaX = deltaStep * cosf(radians((float)angle));
-			float deltaY = deltaStep * sinf(radians((float)angle));
+		//// I'd like to figure out how to improve this collision system
+		//// Variables that will be filled with info from the ray with the longest length
+		//float maxDistance = -FLT_MAX;
+		//float intersectX = fPlayerX;
+		//float intersectY = fPlayerY;
+		//// Cast a ray out in a circle around the player
+		//for (int angle = 0; angle < 360; angle += 20)
+		//{
+		//	bool missedWall = true;
+		//	
+		//	// Get the individual components of the ray slope
+		//	float deltaX = deltaStep * cosf(radians((float)angle));
+		//	float deltaY = deltaStep * sinf(radians((float)angle));
 
-			// Copy of the player coordinates
-			float stepX = fPlayerX;
-			float stepY = fPlayerY;
+		//	// Copy of the player coordinates
+		//	float stepX = fPlayerX;
+		//	float stepY = fPlayerY;
 
-			// Instead of running until the ray hits a wall, run until the ray is outside of the player radius
-			for (float i = 0.0f; i < (float)nPlayerRadius * deltaStep; i += deltaStep)
-			{
-				stepX += deltaX;
-				stepY += deltaY;
+		//	// Instead of running until the ray hits a wall, run until the ray is outside of the player radius
+		//	for (float i = 0.0f; i < (float)nPlayerRadius * deltaStep; i += deltaStep)
+		//	{
+		//		stepX += deltaX;
+		//		stepY += deltaY;
 
-				// If the ray hits a wall unflag that it missed a wall
-				if (map[(int)stepY * nMapWidth + (int)stepX] != '.' && map[(int)stepY * nMapWidth + (int)stepX] != 'O')
-				{
-					missedWall = false;
-					break;
-				}
-			}
-			
-			if (missedWall)
-				continue;
+		//		// If the ray hits a wall unflag that it missed a wall
+		//		if (!characterInString(map[(int)stepY * nMapWidth + (int)stepX], nonWallCharacters))
+		//		{
+		//			missedWall = false;
+		//			break;
+		//		}
+		//	}
+		//	
+		//	if (missedWall)
+		//		continue;
 
-			// Calculate distance to intersection point
-			float a = fPlayerX - stepX;
-			float b = fPlayerY - stepY;
-			// No need to correct the distance for collisions
-			float distance = sqrtf(a * a + b * b);
+		//	// Calculate distance to intersection point
+		//	float a = fPlayerX - stepX;
+		//	float b = fPlayerY - stepY;
+		//	// No need to correct the distance for collisions
+		//	float distance = sqrtf(a * a + b * b);
 
-			// Check if the ray is the one which will be used to correct the player position
-			if (distance > maxDistance)
-			{
-				maxDistance = distance;
-				intersectX = stepX;
-				intersectY = stepY;
-			}
-		}
+		//	// Check if the ray is the one which will be used to correct the player position
+		//	if (distance > maxDistance)
+		//	{
+		//		maxDistance = distance;
+		//		intersectX = stepX;
+		//		intersectY = stepY;
+		//	}
+		//}
 
-		if (intersectX != fPlayerX && intersectY != fPlayerY)
-		{
-			// Move the player out of the wall. Multiply by a decimal to smooth out the movement
-			fPlayerX += float((fPlayerX - intersectX) * 0.5);
-			fPlayerY += float((fPlayerY - intersectY) * 0.5);
-		}
+		//if (intersectX != fPlayerX && intersectY != fPlayerY)
+		//{
+		//	// Move the player out of the wall. Multiply by a decimal to smooth out the movement
+		//	fPlayerX += float((fPlayerX - intersectX) * 0.5);
+		//	fPlayerY += float((fPlayerY - intersectY) * 0.5);
+		//}
 		
 		// Just in case the above method fails, prevents the player from going out of bounds
 		fPlayerX = constrain(fPlayerX, 0.0f, (float)nMapWidth - 1.0f);
@@ -450,7 +531,7 @@ int main()
 				stepY += deltaY;
 
 				// The ray is intersecting a wall
-				if (map[(int)stepY * nMapWidth + (int)stepX] != '.' && map[(int)stepY * nMapWidth + (int)stepX] != 'O')
+				if (!characterInString(map[(int)stepY * nMapWidth + (int)stepX], nonWallCharacters))
 				{
 					// If the ray-wall intersection point is in a corner, flag the wall to be blank
 					if (((double)stepX - (int)stepX > 0.92 && (double)stepY - (int)stepY > 0.92) || 
@@ -562,15 +643,15 @@ int main()
 			wchar_t wShade;
 			shade sShade = light;
 
-			for (int i = 0; i < nNumberOfLights && !blank; i++)
+			for (int i = 0; i < (signed)lights.size() && !blank; i++)
 			{
 				bool foundWall = false;
 				shade newShade;
 
 				// Calculate the x and y distances from the light source to the intersection point
 				// adjacent = x, opposite = y
-				float adjacent = lights[i][0] - stepX;
-				float opposite = lights[i][1] - stepY;
+				float adjacent = lights[i].x - stepX;
+				float opposite = lights[i].y - stepY;
 
 				// This is the angle between the slice and the light source
 				// We'll leave it in radians to make future calculations easier
@@ -600,7 +681,7 @@ int main()
 					}
 
 					// If the ray hits a wall, flag that it has hit a wall so we can skip calculations
-					if (map[(int)lightStepY * nMapWidth + (int)lightStepX] != '.')
+					if (!characterInString(map[(int)lightStepY * nMapWidth + (int)lightStepX], nonWallCharacters))
 					{
 						foundWall = true;
 					}
@@ -680,64 +761,100 @@ int main()
 			}
 		}
 
+		// Sort sprites based on distance from the player
+		sort(sprites);
+		
+		// Rendered on a per sprite basis, unlike walls
 		for (int i = 0; i < (signed)sprites.size(); i++)
 		{
-			float opposite = sprites[i].x - fPlayerX;
-			float adjacent = sprites[i].y - fPlayerY;
+			float opposite = sprites[i].x - fPlayerX;	// x difference between sprite and player
+			float adjacent = sprites[i].y - fPlayerY;	// y difference between sprite and player
 
 			// Get the angle between the sprite and the player
 			float spriteAngle = degrees(atan2f(adjacent, opposite));
 			spriteAngle = loopAngle(spriteAngle);	// atan2f was returning negative angles, which I thought it wasn't supposed to
 
+			// Find a coterminal angle for sprite angle
+			// This puts spriteAngle in terms of fPlayerA to ensure that their won't be any weirdness transitioning from 0 - 360
+			// For example, if fPlayerA = 400, and spriteAngle = 60, spriteAngle will be reassigned the coterminal angle 420
+			for(float a = fPlayerA; a > 360.0f; a -= 360.0f)
+				spriteAngle += 360.0f;
+
+			// This goes in the opposite direction
+			for(float a = fPlayerA; a <= 0.0f; a += 360.0f)
+				spriteAngle -= 360.0f;
+			
+			// Find the angle from the left of the players field of view to the sprite
 			float angleFromPlayer = fPlayerA + (FOV / 2) - spriteAngle;
+			angleFromPlayer = loopAngle(angleFromPlayer);
+
+			// Calculate the x based on angleFromPlayer (normalizes angleFromPlayer, maps into range nScreenWidth - 0)
+			// (subtract from nScreenWidth to get x)
 			int spriteX = nScreenWidth - int((angleFromPlayer) / FOV * nScreenWidth);
+			// If spriteX is negative, it means that the sprite if out of the players FOV
+			if (spriteX < 0)
+				continue;
 
 			// Get the distance to the sprite
 			float distFromSprite = sqrtf(opposite * opposite + adjacent * adjacent);
-
 			distFromSprite *= nGridSize;
 
-			float spriteHeight = (nScreenHeight / distFromSprite) * nDistFromProjPlane;
+			// Save the distance for sorting next frame
+			sprites[i].distFromPlayer = distFromSprite;
+
+			// Calculate height and ceiling gap similar to how it is calculated with the walls.
+			float spriteHeight = ((nScreenHeight / distFromSprite) * nDistFromProjPlane);
+			// Multiplying by height gives me more control over how tall the sprites are
+			spriteHeight *= sprites[i].height;
 			int ceilingGap = int((nScreenHeight - spriteHeight) / 2);
 			int savedCeilingGap = ceilingGap;
 
 			if (ceilingGap < 0)
 				ceilingGap = 0;
 
-			float spriteWidth = (sprites[i].width * spriteHeight) / sprites[i].height;
-			int halfWidth = int(spriteWidth / 2);
+			// height / width = spriteHeight / spriteWidth (cross multiply)
+			// height * spriteWidth = width * spriteHeight (divide out height)
+			// spriteWidth = (width * spriteHeight) / height
+			float spriteWidth = ((sprites[i].width * spriteHeight) / sprites[i].height);
+			// Multiplying by the width gives me more control over how wide the sprites are
+			spriteWidth *= sprites[i].width;
+			int halfWidth = (int)(spriteWidth / 2);
 
+			// Calculate the beginning and end of the x
 			int spriteStart = spriteX - halfWidth;
 			int spriteEnd = spriteX + halfWidth;
 
-			if (spriteStart < 0)
-				spriteStart = 0;
-
-			if (spriteEnd > nScreenWidth)
-				spriteEnd = nScreenWidth;
-
 			for (int x = spriteStart; x < spriteEnd; x++)
 			{
+				if (x < 0)
+					continue;
+
+				if (x > nScreenWidth)
+					continue;
+
+				// Check if the sprite is the closest thing to the player
 				if (distFromSprite > depthBuffer[x])
 					continue;
 
 				for (int y = ceilingGap; y < nScreenHeight - ceilingGap; y++)
 				{
-					/*float normX = (x - spriteStart) / spriteWidth;
-					float normY = (y - savedCeilingGap) / spriteHeight;
+					// Calculate the normalized coordinates for texturing. The plus one ensures that normX or normY won't be 
+					// greater than one
+					float normX = (x - spriteStart) / (spriteWidth + 1.0f);
+					float normY = (y - savedCeilingGap) / (spriteHeight + 1.0f);
 
+					// Put normalized coordinates into texture coordinates
 					int sampleX = int(normX * sprites[i].spriteMap.width);
 					int sampleY = int(normY * sprites[i].spriteMap.height);
 
+					// Sample colors
 					wchar_t sampleCoords = sprites[i].spriteMap.textureMap[sampleY * sprites[i].spriteMap.width + sampleX];
-
 					int color = interpretSample(sampleCoords);
-
 					if (color < 0)
-						continue;*/
+						continue;
 
-					screen[y * nScreenWidth + x].Attributes = 8;
-					screen[y * nScreenWidth + x].Char.UnicodeChar = L'\u2588';
+					screen[y * nScreenWidth + x].Attributes = color;
+					screen[y * nScreenWidth + x].Char.UnicodeChar = shades[(int)full];
 				}
 			}
 		}
@@ -770,6 +887,16 @@ int main()
 	}
 
 	return 0;
+}
+
+bool characterInString(wchar_t character, wstring& str)
+{
+	for (int i = 0; i < (signed)str.size(); i++)
+	{
+		if (str[i] == character)
+			return true;
+	}
+	return false;
 }
 
 int interpretSample(wchar_t sampledCoords)
@@ -823,6 +950,27 @@ int interpretSample(wchar_t sampledCoords)
 			break;
 	}
 	return -1;
+}
+
+void sort(vector<sprite>& sprites) {
+	bool swap = true;
+	int sorted = 0;
+	while (swap) {
+		swap = false;
+		for (int i = 0; i < (signed)sprites.size(); i++) {
+			int n = i + 1;
+			if (n >= (signed)sprites.size() - sorted)
+				break;
+
+			if (sprites[i].distFromPlayer < sprites[n].distFromPlayer) {
+				sprite temp = sprites[n];
+				sprites[n] = sprites[i];
+				sprites[i] = temp;
+				swap = true;
+			}
+		}
+		sorted++;
+	}
 }
 
 float loopAngle(float angle)
