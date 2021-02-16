@@ -28,8 +28,8 @@ float fDOV = 10.0f;				// Depth of veiw
 float fPlayerX;					// Player X
 float fPlayerY ;				// Player Y
 float fPlayerA = 0.0f;			// Player angle
-int nGridSize = 10;				// Distance value is multiplied by this number
-int nDistFromProjPlane = 30;	// Slice height is multiplied by this number
+int nGridSize = 20;				// Distance value is multiplied by this number
+int nDistFromProjPlane = 40;	// Slice height is multiplied by this number
 
 // Player characteristics
 float fPlayerVel = 5.0f;
@@ -97,13 +97,16 @@ int interpretSample(wchar_t sampleCoords);
 
 // Struct which holds sprite information
 struct sprite {
-	wchar_t character{};
-	float x{};
-	float y{};
-	float width{};
-	float height{};
-	float distFromPlayer{};
-	texture spriteMap;
+	wchar_t character{};		// A character representation of the sprite on the map
+	float x{};					// X position of the sprite
+	float y{};					// Y position of the sprite
+	float a{};					// Angle of the sprite in degrees
+	float width{};				// width of the sprite
+	float height{};				// height of the sprite
+	float distFromPlayer{};		// The distance the sprite is from the player
+	bool remove{};				// whether the sprite should be removed
+	int numberOfTextures{};		// The number of textures the sprite contains
+	texture* spriteTextures;	// An array which holds all textures
 };
 
 // Taking a vector of sprites, sorts them from smallest distFromPlayer to largest distFromPlayer
@@ -239,7 +242,6 @@ int main()
 
 	// Sprite textures
 	texture lampTexture;
-	lampTexture.character = L'*';
 	lampTexture.width = 20;
 	lampTexture.height = 20;
 	lampTexture.textureMap += L"--------------------";
@@ -263,19 +265,139 @@ int main()
 	lampTexture.textureMap += L"--------------------";
 	lampTexture.textureMap += L"--------------------";
 
+	texture smileTexture1;
+	smileTexture1.width = 20;
+	smileTexture1.height = 20;
+	smileTexture1.textureMap += L"--------------------";
+	smileTexture1.textureMap += L"--------------------";
+	smileTexture1.textureMap += L"--------------------";
+	smileTexture1.textureMap += L"--------------------";
+	smileTexture1.textureMap += L"--------------------";
+	smileTexture1.textureMap += L"-------eeeeee-------";
+	smileTexture1.textureMap += L"-----eeeeeeeeee-----";
+	smileTexture1.textureMap += L"---eeeeneeeeneeee---";
+	smileTexture1.textureMap += L"--eeeeeneeeeneeeee--";
+	smileTexture1.textureMap += L"-eeeeeeneeeeneeeeee-";
+	smileTexture1.textureMap += L"-eeeeeeeeeeeeeeeeee-";
+	smileTexture1.textureMap += L"-eenneeeeeeeeeennee-";
+	smileTexture1.textureMap += L"-eeeeneeeeeeeeneeee-";
+	smileTexture1.textureMap += L"--eeeenneeeenneeee--";
+	smileTexture1.textureMap += L"---eeeeennnneeeee---";
+	smileTexture1.textureMap += L"-----eeeeeeeeee-----";
+	smileTexture1.textureMap += L"-------eeeeee-------";
+	smileTexture1.textureMap += L"--------------------";
+	smileTexture1.textureMap += L"--------------------";
+	smileTexture1.textureMap += L"--------------------";
+	smileTexture1.textureMap += L"--------------------";
+
+	texture smileTexture2;
+	smileTexture2.width = 20;
+	smileTexture2.height = 20;
+	smileTexture2.textureMap += L"--------------------";
+	smileTexture2.textureMap += L"--------------------";
+	smileTexture2.textureMap += L"--------------------";
+	smileTexture2.textureMap += L"--------------------";
+	smileTexture2.textureMap += L"--------------------";
+	smileTexture2.textureMap += L"-------eeeeee-------";
+	smileTexture2.textureMap += L"-----eeeeeeeeee-----";
+	smileTexture2.textureMap += L"---eeeeeeeeeeeeee---";
+	smileTexture2.textureMap += L"--eeeeeeeeeeenneee--";
+	smileTexture2.textureMap += L"-eeeeeeeeeeeenneeee-";
+	smileTexture2.textureMap += L"-eeeeeeeeeeeenneeee-";
+	smileTexture2.textureMap += L"-eeeeeeeeeeeeeeeeee-";
+	smileTexture2.textureMap += L"-eeeeeeeeeeeenneeee-";
+	smileTexture2.textureMap += L"--eeeeeeeeeeeeennn--";
+	smileTexture2.textureMap += L"---eeeeeeeeeeeeee---";
+	smileTexture2.textureMap += L"-----eeeeeeeeee-----";
+	smileTexture2.textureMap += L"-------eeeeee-------";
+	smileTexture2.textureMap += L"--------------------";
+	smileTexture2.textureMap += L"--------------------";
+	smileTexture2.textureMap += L"--------------------";
+	smileTexture2.textureMap += L"--------------------";
+
+	texture smileTexture3;
+	smileTexture3.width = 20;
+	smileTexture3.height = 20;
+	smileTexture3.textureMap += L"--------------------";
+	smileTexture3.textureMap += L"--------------------";
+	smileTexture3.textureMap += L"--------------------";
+	smileTexture3.textureMap += L"--------------------";
+	smileTexture3.textureMap += L"--------------------";
+	smileTexture3.textureMap += L"-------eeeeee-------";
+	smileTexture3.textureMap += L"-----eeeeeeeeee-----";
+	smileTexture3.textureMap += L"---eeeeeeeeeeeeee---";
+	smileTexture3.textureMap += L"--eeenneeeeeeeeeee--";
+	smileTexture3.textureMap += L"-eeeenneeeeeeeeeeee-";
+	smileTexture3.textureMap += L"-eeeenneeeeeeeeeeee-";
+	smileTexture3.textureMap += L"-eeeeeeeeeeeeeeeeee-";
+	smileTexture3.textureMap += L"-eeeenneeeeeeeeeeee-";
+	smileTexture3.textureMap += L"--nnneeeeeeeeeeeee--";
+	smileTexture3.textureMap += L"---eeeeeeeeeeeeee---";
+	smileTexture3.textureMap += L"-----eeeeeeeeee-----";
+	smileTexture3.textureMap += L"-------eeeeee-------";
+	smileTexture3.textureMap += L"--------------------";
+	smileTexture3.textureMap += L"--------------------";
+	smileTexture3.textureMap += L"--------------------";
+	smileTexture3.textureMap += L"--------------------";
+
+	texture smileTexture4;
+	smileTexture4.width = 20;
+	smileTexture4.height = 20;
+	smileTexture4.textureMap += L"--------------------";
+	smileTexture4.textureMap += L"--------------------";
+	smileTexture4.textureMap += L"--------------------";
+	smileTexture4.textureMap += L"--------------------";
+	smileTexture4.textureMap += L"--------------------";
+	smileTexture4.textureMap += L"-------eeeeee-------";
+	smileTexture4.textureMap += L"-----eeeeeeeeee-----";
+	smileTexture4.textureMap += L"---eeeeeeeeeeeeee---";
+	smileTexture4.textureMap += L"--eeeeeeeeeeeeeeee--";
+	smileTexture4.textureMap += L"-eeeeeeeeeeeeeeeeee-";
+	smileTexture4.textureMap += L"-eeeeeeeeeeeeeeeeee-";
+	smileTexture4.textureMap += L"-eeeeeeeeeeeeeeeeee-";
+	smileTexture4.textureMap += L"-eeeeeeeeeeeeeeeeee-";
+	smileTexture4.textureMap += L"--eeeeeeeeeeeeeeee--";
+	smileTexture4.textureMap += L"---eeeeeeeeeeeeee---";
+	smileTexture4.textureMap += L"-----eeeeeeeeee-----";
+	smileTexture4.textureMap += L"-------eeeeee-------";
+	smileTexture4.textureMap += L"--------------------";
+	smileTexture4.textureMap += L"--------------------";
+	smileTexture4.textureMap += L"--------------------";
+	smileTexture4.textureMap += L"--------------------";
+
+
+
 	// Define a sprite. Sprites use textures to display themselves, so we use the color table used for the spriteMap
-	
 	sprite lampSprite;
 	lampSprite.character = L'O';
 	lampSprite.x;
 	lampSprite.y;
+	lampSprite.a = 0.0f;
 	lampSprite.width = 0.75f;
 	lampSprite.height = 1.5f;
-	lampSprite.distFromPlayer = 0.0f;
-	lampSprite.spriteMap = lampTexture;
+	lampSprite.remove = false;
+	lampSprite.numberOfTextures = 1;
+	lampSprite.spriteTextures = new texture[lampSprite.numberOfTextures];
+	lampSprite.spriteTextures[0] = lampTexture;
 
-	const int nNumberOfSpriteTypes = 1;
-	sprite spriteTypes[nNumberOfSpriteTypes] = { lampSprite };
+	sprite smileySprite;
+	smileySprite.character = L'S';
+	smileySprite.x;
+	smileySprite.y;
+	smileySprite.a = 0.0f;
+	smileySprite.width = 1.0f;
+	smileySprite.height = 1.0f;
+	smileySprite.remove = false;
+	smileySprite.numberOfTextures = 4;
+	smileySprite.spriteTextures = new texture[smileySprite.numberOfTextures];
+	smileySprite.spriteTextures[0] = smileTexture1;
+	smileySprite.spriteTextures[1] = smileTexture3;
+	smileySprite.spriteTextures[2] = smileTexture4;
+	smileySprite.spriteTextures[3] = smileTexture2;
+
+
+	const int nNumberOfSpriteTypes = 2;
+	sprite spriteTypes[nNumberOfSpriteTypes] = { lampSprite, smileySprite };
 
 
 	// Create and fill a map
@@ -283,7 +405,7 @@ int main()
 	map += L"%%%%%%%%%%%%%%%%%%%%######$#######$#####";
 	map += L"#..................##..................#";
 	map += L"#..###........###..##..................#";
-	map += L"#..###....O...###..##..................#";
+	map += L"#..###....O...###..##.........S........#";
 	map += L"#..###........###..##..................#";
 	map += L"#..................##..................#";
 	map += L"#..........P...........................#";
@@ -301,18 +423,19 @@ int main()
 	map += L"#..................##..................#";
 	map += L"########################################";
 
-	vector<lamp> lights;
-	vector<sprite> sprites;
-	wstring nonWallCharacters = L"PO.";
+	vector<lamp> lights;				// All the lights in the scene
+	vector<sprite> sprites;				// All the sprites in the scene
+	wstring nonWallCharacters = L"PO.";	// The characters that are not walls, makes it easy to collide rays with walls
 
+	// Loop throught every map character
 	for (int x = 0; x < nMapWidth; x++)
 	{
-		
 		for (int y = 0; y < nMapHeight; y++)
 		{
-			bool isTexture = false;
 			wchar_t currentChar = map[y * nMapWidth + x];
+			bool isTexture = false;
 
+			// Check if the current character is a texture
 			for (int i = 0; i < nNumberOfTextures; i++)
 			{
 				if (currentChar == textures[i].character)
@@ -322,16 +445,21 @@ int main()
 				}
 			}
 
+			// If the current character is a texture, continue
 			if (isTexture)
 				continue;
 
+			// Check if the current character is a sprite
 			for (int i = 0; i < nNumberOfSpriteTypes; i++)
 			{
+				// If the sprite is not a light
 				if (currentChar == spriteTypes[i].character && currentChar != 'O')
 				{
-					if(characterInString(currentChar, nonWallCharacters))
+					// If the sprite has not been added to the string of non wall characters, add it
+					if(!characterInString(currentChar, nonWallCharacters))
 						nonWallCharacters += spriteTypes[i].character;
 
+					// Add a new instance of the sprite to the sprites list
 					sprite newSprite = spriteTypes[i];
 					newSprite.x = (float)x + 0.5f;
 					newSprite.y = (float)y + 0.5f;
@@ -339,6 +467,7 @@ int main()
 				}
 			}
 
+			// Add predefined things such as lights or the player
 			switch (currentChar)
 			{
 				case 'P':
@@ -357,6 +486,7 @@ int main()
 		}
 	}
 
+	// Replace the player location with a blank
 	map[(int)fPlayerY * nMapWidth + (int)fPlayerX] = L'.';
 
 	// Infinite loop!
@@ -373,7 +503,7 @@ int main()
 				backgroundColor = BACKGROUND_GREEN;
 
 			screen[i].Char.UnicodeChar = L' ';
-			screen[i].Attributes = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | backgroundColor;
+			screen[i].Attributes =  FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | backgroundColor;
 		}
 
 		//  Determine how much time has elapsed between frames
@@ -406,8 +536,10 @@ int main()
 
 			if (!characterInString(map[(int)fPlayerY * nMapWidth + (int)fPlayerX], nonWallCharacters))
 			{
-				fPlayerX -= playerVelX;
-				fPlayerY -= playerVelY;
+				if(abs(playerVelX) > abs(playerVelY))
+					fPlayerX -= playerVelX;
+				else
+					fPlayerY -= playerVelY;
 			}
 		}
 
@@ -419,8 +551,10 @@ int main()
 
 			if (!characterInString(map[(int)fPlayerY * nMapWidth + (int)fPlayerX], nonWallCharacters))
 			{
-				fPlayerX += playerVelX;
-				fPlayerY += playerVelY;
+				if(abs(playerVelX) > abs(playerVelY))
+					fPlayerX += playerVelX;
+				else
+					fPlayerY += playerVelY;
 			}
 		}
 
@@ -775,12 +909,13 @@ int main()
 			spriteAngle = loopAngle(spriteAngle);	// atan2f was returning negative angles, which I thought it wasn't supposed to
 
 			// Find a coterminal angle for sprite angle
-			// This puts spriteAngle in terms of fPlayerA to ensure that their won't be any weirdness transitioning from 0 - 360
+			// This puts spriteAngle in terms of fPlayerA to ensure that their won't be any weirdness transitioning from 0 -> 359, or
+			// vice versa
 			// For example, if fPlayerA = 400, and spriteAngle = 60, spriteAngle will be reassigned the coterminal angle 420
 			for(float a = fPlayerA; a > 360.0f; a -= 360.0f)
 				spriteAngle += 360.0f;
 
-			// This goes in the opposite direction
+			// Does the same thing as the above except in the reverse
 			for(float a = fPlayerA; a <= 0.0f; a += 360.0f)
 				spriteAngle -= 360.0f;
 			
@@ -824,6 +959,40 @@ int main()
 			int spriteStart = spriteX - halfWidth;
 			int spriteEnd = spriteX + halfWidth;
 
+			// Calculate the correct texture to be displayed based on orientation from player
+			int textureIndex = 0;
+			if (sprites[i].numberOfTextures == 1)
+			{
+				textureIndex = 0;
+			}
+			else
+			{
+				// Reuse opposite and adjacent variables from above
+				opposite = fPlayerX - sprites[i].x;
+				adjacent = fPlayerY - sprites[i].y;
+
+				// Reuse spriteAngle variable
+				spriteAngle = degrees(atan2f(opposite, adjacent));
+				spriteAngle = loopAngle(spriteAngle);
+				
+				// This is the angle between each texture
+				int angleGap = int(360 / sprites[i].numberOfTextures);
+
+				// The first texture should be drawn to the screen if the angle is within the first gap
+				if (spriteAngle < angleGap)
+					textureIndex = 0;
+				else
+				{
+					// Count down to where the angle is within the first gap. The number of iterations this takes is the 
+					// texture index
+					while (spriteAngle > angleGap)
+					{
+						textureIndex += 1;
+						spriteAngle -= angleGap;
+					}
+				}
+			}
+
 			for (int x = spriteStart; x < spriteEnd; x++)
 			{
 				if (x < 0)
@@ -844,11 +1013,11 @@ int main()
 					float normY = (y - savedCeilingGap) / (spriteHeight + 1.0f);
 
 					// Put normalized coordinates into texture coordinates
-					int sampleX = int(normX * sprites[i].spriteMap.width);
-					int sampleY = int(normY * sprites[i].spriteMap.height);
+					int sampleX = int(normX * sprites[i].spriteTextures[textureIndex].width);
+					int sampleY = int(normY * sprites[i].spriteTextures[textureIndex].height);
 
 					// Sample colors
-					wchar_t sampleCoords = sprites[i].spriteMap.textureMap[sampleY * sprites[i].spriteMap.width + sampleX];
+					wchar_t sampleCoords = sprites[i].spriteTextures[textureIndex].textureMap[sampleY * sprites[i].spriteTextures[textureIndex].width + sampleX];
 					int color = interpretSample(sampleCoords);
 					if (color < 0)
 						continue;
@@ -857,6 +1026,13 @@ int main()
 					screen[y * nScreenWidth + x].Char.UnicodeChar = shades[(int)full];
 				}
 			}
+		}
+
+		// Remove any dead or unnecessary sprites
+		for (int i = 0; i < (signed)sprites.size(); i++)
+		{
+			if (sprites[i].remove)
+				sprites.erase(sprites.begin() + i);
 		}
 
 		// Saves the previous player character so that after displaying the map I can erase the previous player position
@@ -953,6 +1129,7 @@ int interpretSample(wchar_t sampledCoords)
 }
 
 void sort(vector<sprite>& sprites) {
+	// Bubble sort
 	bool swap = true;
 	int sorted = 0;
 	while (swap) {
