@@ -384,7 +384,7 @@ int main()
 	smileySprite.character = L'S';
 	smileySprite.x;
 	smileySprite.y;
-	smileySprite.a = 0.0f;
+	smileySprite.a = 180.0f;
 	smileySprite.width = 1.0f;
 	smileySprite.height = 1.0f;
 	smileySprite.remove = false;
@@ -537,9 +537,9 @@ int main()
 			if (!characterInString(map[(int)fPlayerY * nMapWidth + (int)fPlayerX], nonWallCharacters))
 			{
 				if(abs(playerVelX) > abs(playerVelY))
-					fPlayerX -= playerVelX;
+					fPlayerX -= playerVelX * 2.0f;
 				else
-					fPlayerY -= playerVelY;
+					fPlayerY -= playerVelY * 2.0f;
 			}
 		}
 
@@ -552,9 +552,9 @@ int main()
 			if (!characterInString(map[(int)fPlayerY * nMapWidth + (int)fPlayerX], nonWallCharacters))
 			{
 				if(abs(playerVelX) > abs(playerVelY))
-					fPlayerX += playerVelX;
+					fPlayerX += playerVelX * 2.0f;
 				else
-					fPlayerY += playerVelY;
+					fPlayerY += playerVelY * 2.0f;
 			}
 		}
 
@@ -974,21 +974,30 @@ int main()
 				// Reuse spriteAngle variable
 				spriteAngle = degrees(atan2f(opposite, adjacent));
 				spriteAngle = loopAngle(spriteAngle);
+				// spriteAngle = loopAngle(spriteAngle + sprites[i].a);
 				
 				// This is the angle between each texture
 				int angleGap = int(360 / sprites[i].numberOfTextures);
+				
+				// Textures are selected by finding the texture pane or section that is most perpendicular to the angle between
+				// the sprite and the player
+				// What the sprite looks like in theory:
+				//							   \|/
+				//							  --O--
+				//							   /|\
+				// Hold the smallest difference between ninety and an angle to determine the most perpendicular 
+				float closestTo90 = FLT_MAX;
 
-				// The first texture should be drawn to the screen if the angle is within the first gap
-				if (spriteAngle < angleGap)
-					textureIndex = 0;
-				else
+				// 
+				for (int texturePane = 0; texturePane < 360 / (int)angleGap; texturePane++)
 				{
-					// Count down to where the angle is within the first gap. The number of iterations this takes is the 
-					// texture index
-					while (spriteAngle > angleGap)
+					// Find the difference between the sprite angle and the angle of the texture pane
+					float angleDiff = spriteAngle - float(angleGap * texturePane);
+
+					if (abs(90.0f - abs(angleDiff)) < closestTo90)
 					{
-						textureIndex += 1;
-						spriteAngle -= angleGap;
+						closestTo90 = abs(90.0f - abs(angleDiff));
+						textureIndex = texturePane;
 					}
 				}
 			}
